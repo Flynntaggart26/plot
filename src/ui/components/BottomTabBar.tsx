@@ -14,7 +14,7 @@ import { useTheme } from '../theme';
 import { usePressScale, useReduceMotion } from '../motion/hooks';
 import { haptic } from '@/lib/haptics';
 import { useUIStore } from '@/lib/ui-store';
-import { duration, fontFaceFor, spring } from '@/ui/tokens';
+import { duration, fontFaceFor, glow, radius, spring } from '@/ui/tokens';
 
 const FAB_SIZE = 56;
 /** Kısa ekranlarda FAB boşluğunu daralt; çubuk rozet büyüklüğünü korur. */
@@ -127,7 +127,17 @@ function TabButton({
   const tabType = type.tab;
 
   return (
-    <Animated.View style={[styles.tab, pressStyle]}>
+    <Animated.View
+      style={[
+        styles.tab,
+        pressStyle,
+        active && {
+          ...glow.soft,
+          backgroundColor: c.surfaceRaised,
+          borderRadius: radius.card,
+        },
+      ]}
+    >
       <Pressable
         {...handlers}
         onPress={onPress}
@@ -155,6 +165,7 @@ function TabButton({
               fontSize: tabType.size,
               lineHeight: tabType.lineHeight,
               letterSpacing: tabType.letterSpacing,
+              fontWeight: active ? '600' : '500',
             },
             labelStyle,
           ]}

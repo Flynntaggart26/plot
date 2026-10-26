@@ -130,6 +130,39 @@ export const space = {
   xxl: 40,
 } as const;
 
+// ─── Işık / Parlaklık ────────────────────────────────────────────────────────
+
+/**
+ * Odak modunda ve vurgulu elemanlarda kullanılan parlaklık gölgeleri.
+ * Native'de `shadowColor` + `elevation`, web'de `box-shadow` olarak uygulanır.
+ */
+export const glow = {
+  /** Hafif parlaklık — kart kenarları, butonlar */
+  soft: {
+    shadowColor: '#E8A33D',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  /** Orta parlaklık — aktif sekme, FAB */
+  medium: {
+    shadowColor: '#E8A33D',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  /** Yoğun parlaklık — aktif odak halkası */
+  strong: {
+    shadowColor: '#E8A33D',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.65,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+} as const;
+
 // ─── Köşe ────────────────────────────────────────────────────────────────────
 
 export const radius = {

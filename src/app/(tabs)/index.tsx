@@ -13,6 +13,7 @@ import { TaskRow } from '@/features/tasks/TaskRow';
 import { EnergyRow } from '@/features/today/EnergyRow';
 import { Timeline } from '@/features/today/Timeline';
 import { useDayEnergy, useSetDayEnergy } from '@/features/today/queries';
+import { glow } from '@/ui/tokens';
 
 /**
  * Today — günün tek bakışta görünen hâli.
@@ -74,6 +75,7 @@ export default function TodayScreen() {
         <SectionCard
           label="MUST-DO"
           count={data ? `${data.mustDo.length} / ${MUST_DO_LIMIT}` : '—'}
+          glowing={Boolean(data && data.mustDo.length > 0)}
           action={
             data && data.mustDo.length < MUST_DO_LIMIT ? (
               <Pressable
@@ -120,7 +122,11 @@ export default function TodayScreen() {
         </SectionCard>
 
         {data && data.done.length > 0 ? (
-          <SectionCard label="TAMAMLANANLAR" count={String(data.done.length)}>
+          <SectionCard
+            label="TAMAMLANANLAR"
+            count={String(data.done.length)}
+            glowing={true}
+          >
             <TaskList data={data} list="done" onToggle={onToggle} isPending={isPending} />
           </SectionCard>
         ) : null}
@@ -138,27 +144,42 @@ function SectionCard({
   count,
   action,
   children,
+  glowing = false,
 }: {
   label: string;
   count: string;
   action?: React.ReactNode;
   children: React.ReactNode;
+  glowing?: boolean;
 }) {
   const { c, space, radius } = useTheme();
 
   return (
     <View
-      style={{
-        marginTop: space.md,
-        paddingHorizontal: space.md,
-        paddingTop: space.sm,
-        paddingBottom: space.xs,
-        backgroundColor: c.surface,
-        borderRadius: radius.card,
-      }}
+      style={[
+        styles.cardBase,
+        {
+          marginTop: space.md,
+          paddingHorizontal: space.md,
+          paddingTop: space.sm,
+          paddingBottom: space.xs,
+          backgroundColor: c.surface,
+          borderRadius: radius.card,
+          borderWidth: glowing ? StyleSheet.hairlineWidth : 0,
+          borderColor: glowing ? c.accent : c.border,
+          ...(glowing && glow.soft),
+        },
+      ]}
     >
       <View style={styles.cardHeader}>
-        <AppText variant="meta" style={{ letterSpacing: 1.2, color: c.accent }}>
+        <AppText
+          variant="meta"
+          style={{
+            letterSpacing: 1.2,
+            color: glowing ? c.focus : c.accent,
+            fontWeight: '600',
+          }}
+        >
           {label}
         </AppText>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xxs }}>
@@ -261,6 +282,9 @@ function ErrorBanner({
 }
 
 const styles = StyleSheet.create({
+  cardBase: {
+    backgroundColor: 'transparent',
+  },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
