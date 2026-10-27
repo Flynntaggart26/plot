@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
-import { BackHandler, Pressable, StyleSheet, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { BackHandler, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, type Href } from 'expo-router';
 import Animated, {
   interpolate,
@@ -13,8 +14,11 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme';
 import { AppText } from './Screen';
+import { Sheen } from './Sheen';
 import { usePressScale, useReduceMotion } from '../motion/hooks';
 import { haptic } from '@/lib/haptics';
+import { alpha } from '../color';
+import { SHORTCUT_HINTS } from '@/lib/use-shortcuts';
 import { duration, spring, stagger } from '@/ui/tokens';
 
 type CaptureTarget = 'task' | 'note' | 'idea';
@@ -137,6 +141,15 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
             sheetStyle,
           ]}
         >
+          <LinearGradient
+            pointerEvents="none"
+            colors={[alpha(c.accent, 0.14), 'transparent']}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={styles.sheetGlow}
+          />
+          <View pointerEvents="none" style={[styles.sheetEdge, { backgroundColor: c.edge }]} />
+
           <View style={[styles.handle, { backgroundColor: c.borderStrong }]} />
           <View style={{ height: space.md }} />
 
@@ -150,6 +163,28 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
               interactive={open}
             />
           ))}
+
+          {Platform.OS === 'web' ? (
+            <View style={styles.hints} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              {SHORTCUT_HINTS.map((hint) => (
+                <View key={hint.key} style={styles.hint}>
+                  <View
+                    style={[
+                      styles.keycap,
+                      { borderColor: c.border, backgroundColor: c.surface },
+                    ]}
+                  >
+                    <AppText variant="meta" faint style={styles.keycapText}>
+                      {hint.key}
+                    </AppText>
+                  </View>
+                  <AppText variant="meta" faint>
+                    {hint.label}
+                  </AppText>
+                </View>
+              ))}
+            </View>
+          ) : null}
         </Animated.View>
       </View>
     </View>
@@ -171,6 +206,7 @@ function CaptureOption({
 }) {
   const { c, space, radius } = useTheme();
   const { style: pressStyle, handlers } = usePressScale();
+  const [hovered, setHovered] = useState(false);
 
   const enterStyle = useAnimatedStyle(() => {
     const start = (index * stagger.step) / duration.slow;
@@ -197,18 +233,32 @@ function CaptureOption({
           accessible={interactive}
           accessibilityRole="button"
           accessibilityLabel={`${target.label}: ${target.hint}`}
+          onHoverIn={() => setHovered(true)}
+          onHoverOut={() => setHovered(false)}
           style={[
             styles.option,
             {
-              backgroundColor: c.surface,
+              backgroundColor: hovered ? c.surfaceRaised : c.surface,
+              borderColor: hovered ? alpha(c.accent, 0.45) : c.border,
+              borderWidth: StyleSheet.hairlineWidth,
               borderRadius: radius.card,
               paddingHorizontal: space.md,
               paddingVertical: space.md,
               gap: space.sm,
               marginBottom: space.sm,
+              overflow: 'hidden',
+              cursor: 'pointer',
             },
           ]}
         >
+          <Sheen
+            color={c.sheen}
+            intensity={hovered ? 0.1 : 0}
+            durationMs={900}
+            delayMs={0}
+            loop={false}
+            active={hovered}
+          />
           <View
             style={[styles.optionIcon, { backgroundColor: c.accentSoft, borderRadius: radius.sm }]}
           >
@@ -242,6 +292,46 @@ const styles = StyleSheet.create({
   sheet: {
     width: '100%',
     maxWidth: SHEET_MAX_WIDTH,
+    overflow: 'hidden',
+  },
+  sheetGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 180,
+  },
+  sheetEdge: {
+    position: 'absolute',
+    top: 0,
+    left: 24,
+    right: 24,
+    height: StyleSheet.hairlineWidth * 2,
+  },
+  hints: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 16,
+    marginTop: 4,
+  },
+  hint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  keycap: {
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: 5,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  keycapText: {
+    fontSize: 10,
+    letterSpacing: 0.4,
   },
   handle: {
     alignSelf: 'center',
