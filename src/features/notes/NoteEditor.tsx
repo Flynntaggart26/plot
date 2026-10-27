@@ -111,13 +111,13 @@ export function NoteEditor({
       >
         <View style={{ gap: sp.sm }}>
           <Text style={{ color: c.textMuted, fontSize: 12, fontWeight: '600' }}>
-            Ba\u015fl\u0131k
+            Başlık
           </Text>
           <TextInput
             ref={textRef}
             value={title}
             onChangeText={setTitle}
-            placeholder="Not ba\u015fl\u0131\u011f\u0131"
+            placeholder="Not başlığı"
             style={[inputStyle, inputContainerStyle]}
             autoFocus
             returnKeyType="done"
@@ -127,12 +127,12 @@ export function NoteEditor({
 
         <View style={{ gap: sp.sm }}>
           <Text style={{ color: c.textMuted, fontSize: 12, fontWeight: '600' }}>
-            G\u00f6vde (Markdown)
+            Gövde (Markdown)
           </Text>
           <TextInput
             value={body}
             onChangeText={setBody}
-            placeholder="D\u00fc\u015f\u00fcncelerinizi buraya yaz\u0131n... [[Ba\u011fl\u0131k]] ile link ekleyebilirsiniz."
+            placeholder="Düşüncelerinizi buraya yazın... [[Başlık]] ile link ekleyebilirsiniz."
             multiline
             numberOfLines={12}
             style={[editorStyle, editorContainerStyle]}

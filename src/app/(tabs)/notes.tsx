@@ -70,9 +70,9 @@ export default function NotesScreen() {
   if (isLoading) {
     return (
       <Screen>
-        <ScreenIntro title="Notlar" subtitle="Notlar\u00fcnuz y\u00fckleniyor..." />
+        <ScreenIntro title="Notlar" subtitle="Notlarınız yükleniyor..." />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: c.textMuted }}>Y\u00fckleniyor...</Text>
+          <Text style={{ color: c.textMuted }}>Yükleniyor...</Text>
         </View>
       </Screen>
     );
@@ -115,13 +115,13 @@ export default function NotesScreen() {
     <Screen>
       <ScreenIntro
         title="Notlar"
-        subtitle={sortedNotes.length + ' not \u011f [[Ba\u011fl\u0131k]] ile ba\u011flant\u0131 kurabilirsiniz'}
+        subtitle={sortedNotes.length + ' not · [[Başlık]] ile bağlantı kurabilirsiniz'}
       />
 
       {sortedNotes.length === 0 ? (
         <EmptyState
           headline="Not yok"
-          hint="\u0130lk notunuzu olu\u015ftru\u015fn. \u0130kincisi geldi\u011finde [[ba\u011flant\u0131]] kurmaya ba\u015flayabilirsiniz."
+          hint="İlk notunuzu oluşturun. İkincisi geldiğinde [[bağlantı]] kurmaya başlayabilirsiniz."
         />
       ) : (
         <ScrollView

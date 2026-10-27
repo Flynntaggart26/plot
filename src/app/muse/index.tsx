@@ -72,7 +72,7 @@ export default function MuseScreen() {
   if (threadsLoading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg }}>
-        <Text style={{ color: c.textMuted }}>Sohbetler y\u00fckleniyor...</Text>
+        <Text style={{ color: c.textMuted }}>Sohbetler yükleniyor...</Text>
       </View>
     );
   }
@@ -250,7 +250,7 @@ export default function MuseScreen() {
 
         {messagesLoading && (
           <View style={{ alignSelf: 'center', paddingVertical: sp.md }}>
-            <Text style={{ color: c.textMuted, fontSize: 13 }}>Y\u00fckleniyor...</Text>
+            <Text style={{ color: c.textMuted, fontSize: 13 }}>Yükleniyor...</Text>
           </View>
         )}
       </ScrollView>
@@ -277,7 +277,7 @@ export default function MuseScreen() {
           onPress={handleSend}
           disabled={busy || !msgInput.trim()}
           accessible
-          accessibilityLabel="G\u00f6nder"
+          accessibilityLabel="Gönder"
           style={[
             sendButtonStyle,
             { backgroundColor: (busy || !msgInput.trim()) ? c.border : c.accent },

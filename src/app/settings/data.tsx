@@ -136,7 +136,7 @@ export default function DataScreen() {
     <Screen>
       <ScreenIntro
         title="Veri Yedekleme"
-        subtitle="T\u00fcm verinizi JSON veya Markdown olarak d\u0131\u015far\u0131 aktar\u0131n, geri y\u00fckleyin."
+        subtitle="Tüm verinizi JSON veya Markdown olarak dışarı aktarın, geri yükleyin."
       />
 
       <ScrollView
@@ -164,15 +164,15 @@ export default function DataScreen() {
         )}
 
         <View style={sectionStyle}>
-          <Text style={sectionTitleStyle}>JSON Yede\u00e7i</Text>
-          <Text style={sectionHintStyle}>T\u00fcm veritaban\u0131, ham JSON format\u0131nda.</Text>
+          <Text style={sectionTitleStyle}>JSON Yedeği</Text>
+          <Text style={sectionHintStyle}>Tüm veritabanı, ham JSON formatında.</Text>
           <Pressable
             {...pressHandlers}
             style={[actionButtonStyle, { backgroundColor: c.accent }]}
             onPress={handleExport}
             disabled={isExporting}
             accessible
-            accessibilityLabel="JSON yede\u00e7i olu\u015ftur"
+            accessibilityLabel="JSON yedeği oluştur"
           >
             <Ionicons
               name={isExporting ? 'reload-circle' : 'download-outline'}
@@ -184,7 +184,7 @@ export default function DataScreen() {
             </Text>
           </Pressable>
 
-          {exportText && (
+          {Boolean(exportText) && (
             <View style={{ marginTop: space.sm }}>
               <TextInput
                 value={exportText}
@@ -198,21 +198,21 @@ export default function DataScreen() {
         </View>
 
         <View style={sectionStyle}>
-          <Text style={sectionTitleStyle}>Markdown \u00d6zeti</Text>
-          <Text style={sectionHintStyle}>\u0130nsan okunabilir .md format\u0131nda yedek.</Text>
+          <Text style={sectionTitleStyle}>Markdown Özeti</Text>
+          <Text style={sectionHintStyle}>İnsan okunabilir .md formatında yedek.</Text>
           <Pressable
             {...pressHandlers}
             style={[actionButtonStyle, { backgroundColor: c.surfaceRaised, borderWidth: HAIRLINE, borderColor: c.border }]}
             onPress={handleExport}
             disabled={isExporting}
             accessible
-            accessibilityLabel="Markdown yede\u00e7i olu\u015ftur"
+            accessibilityLabel="Markdown yedeği oluştur"
           >
             <Ionicons name={isExporting ? 'reload-circle' : 'document-text-outline'} size={18} color={c.text} />
-            <Text style={actionTextStyle}>Markdown Olu\u015ftur</Text>
+            <Text style={actionTextStyle}>Markdown Oluştur</Text>
           </Pressable>
 
-          {markdownText && (
+          {Boolean(markdownText) && (
             <View style={{ marginTop: space.sm }}>
               <TextInput
                 value={markdownText}
@@ -226,12 +226,12 @@ export default function DataScreen() {
         </View>
 
         <View style={sectionStyle}>
-          <Text style={sectionTitleStyle}>Veri \u00c7\u0131\u011f\u0131 Aktar</Text>
-          <Text style={sectionHintStyle}>JSON yede\u00e7ini buraya yap\u0131\u015ft\u0131r\u0131n ve geri y\u00fckleyin.</Text>
+          <Text style={sectionTitleStyle}>Veri İçe Aktar</Text>
+          <Text style={sectionHintStyle}>JSON yedeğini buraya yapıştırın ve geri yükleyin.</Text>
           <TextInput
             value={importText}
             onChangeText={setImportText}
-            placeholder="JSON i\u00e7eri\u011fini buraya yap\u0131\u015ft\u0131r\u0131n..."
+            placeholder="JSON içeriğini buraya yapıştırın..."
             multiline
             numberOfLines={6}
             style={importInputStyle}
@@ -242,7 +242,7 @@ export default function DataScreen() {
             onPress={handleImport}
             disabled={isImporting || !importText.trim()}
             accessible
-            accessibilityLabel="Veriyi i\u00e7eri aktar"
+            accessibilityLabel="Veriyi içeri aktar"
           >
             <Ionicons
               name={isImporting ? 'reload-circle' : 'cloud-upload-outline'}
@@ -250,7 +250,7 @@ export default function DataScreen() {
               color={c.bg}
             />
             <Text style={actionTextStyle}>
-              {isImporting ? 'Y\u00fckleniyor...' : '\u00c7\u0131\u011f\u0131 Aktar'}
+              {isImporting ? 'Yükleniyor...' : 'İçe Aktar'}
             </Text>
           </Pressable>
         </View>

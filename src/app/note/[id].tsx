@@ -32,7 +32,7 @@ export default function NoteDetail() {
   if (isLoading) {
     return (
       <Screen>
-        <ScreenIntro title="Not" subtitle="Y\u00fckleniyor..." />
+        <ScreenIntro title="Not" subtitle="Yükleniyor..." />
       </Screen>
     );
   }
@@ -40,7 +40,7 @@ export default function NoteDetail() {
   if (!note) {
     return (
       <Screen>
-        <ScreenIntro title="Not" subtitle="Not bulunamad\u0131." />
+        <ScreenIntro title="Not" subtitle="Not bulunamadı." />
       </Screen>
     );
   }
