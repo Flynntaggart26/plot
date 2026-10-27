@@ -302,3 +302,17 @@ export function listDayTasks(dayKey: string = localDayKey()): DayTasks {
 
   return { mustDo, open, done };
 }
+
+/**
+ * Tüm açık görevler. Plan ekranındaki kaynak panel, görünür haftanın
+ * dışında kalan görevleri buradan süzer; böylece planlaması kaldırılan
+ * bir görev de panelde yeniden görünür.
+ */
+export function listOpenTasks(): Task[] {
+  return getDb()
+    .select()
+    .from(tasks)
+    .where(eq(tasks.status, 'open'))
+    .orderBy(desc(tasks.priority), asc(tasks.sortOrder), asc(tasks.createdAt))
+    .all();
+}

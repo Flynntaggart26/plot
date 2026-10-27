@@ -14,6 +14,10 @@ import {
 import { useTheme } from '@/ui/theme';
 import { Button } from '@/ui/components/Button';
 import { haptic } from '@/lib/haptics';
+import { toast } from '@/lib/toast';
+import { extractWikiLinks } from './service';
+import { normalizeTitle } from './link-utils';
+import { NotePickerSheet } from './NoteLinks';
 
 export type NoteEditorProps = {
   noteId?: string;
@@ -30,6 +34,7 @@ export type NoteEditorProps = {
  * basış ve yükleme davranışı tek yerden gelsin.
  */
 export function NoteEditor({
+  noteId,
   initialTitle,
   initialBody,
   onSave,
@@ -40,7 +45,38 @@ export function NoteEditor({
   const [title, setTitle] = useState(initialTitle);
   const [body, setBody] = useState(initialBody);
   const [focused, setFocused] = useState<'title' | 'body' | null>(null);
+  const [selection, setSelection] = useState({ start: initialBody.length, end: initialBody.length });
+  const [forcedSelection, setForcedSelection] = useState<
+    { start: number; end: number } | undefined
+  >(undefined);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const textRef = useRef<TextInputInstance | null>(null);
+
+  const insertLink = (picked: string) => {
+    const clean = picked.trim();
+    if (!clean) return;
+
+    const already = extractWikiLinks(body).some(
+      (existing) => normalizeTitle(existing) === normalizeTitle(clean),
+    );
+    if (already) {
+      toast('Zaten bağlı', 'info');
+      setPickerOpen(false);
+      return;
+    }
+
+    const snippet = `[[${clean}]]`;
+    const start = Math.min(selection.start, body.length);
+    const end = Math.min(selection.end, body.length);
+    const next = `${body.slice(0, start)}${snippet}${body.slice(end)}`;
+    const cursor = start + snippet.length;
+
+    setBody(next);
+    setSelection({ start: cursor, end: cursor });
+    setForcedSelection({ start: cursor, end: cursor });
+    setPickerOpen(false);
+    haptic('light');
+  };
 
   const handleSave = () => {
     if (!title.trim()) {
@@ -128,6 +164,11 @@ export function NoteEditor({
             placeholder="Düşüncelerinizi buraya yazın... [[Başlık]] ile link ekleyebilirsiniz."
             placeholderTextColor={c.textFaint}
             selectionColor={c.accent}
+            selection={forcedSelection}
+            onSelectionChange={(event) => {
+              setSelection(event.nativeEvent.selection);
+              setForcedSelection(undefined);
+            }}
             onFocus={() => setFocused('body')}
             onBlur={() => setFocused(null)}
             multiline
@@ -140,6 +181,20 @@ export function NoteEditor({
             ]}
           />
         </View>
+
+        <Button
+          label="Bağlantı ekle"
+          variant="secondary"
+          icon="link-outline"
+          onPress={() => setPickerOpen(true)}
+        />
+
+        <NotePickerSheet
+          visible={pickerOpen}
+          excludeId={noteId}
+          onSelect={insertLink}
+          onClose={() => setPickerOpen(false)}
+        />
 
         {error ? (
           <View

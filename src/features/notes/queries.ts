@@ -4,6 +4,7 @@ import {
   createNote,
   createNoteLink,
   deleteNote,
+  getBacklinks,
   getDailyNote,
   getNote,
   getNoteLinks,
@@ -20,6 +21,7 @@ export const noteKeys = {
   daily: (dayKey: string) => ['notes', 'daily', dayKey] as const,
   detail: (id: string) => ['notes', 'detail', id] as const,
   links: (noteId: string) => ['notes', 'links', noteId] as const,
+  backlinks: (noteId: string) => ['notes', 'backlinks', noteId] as const,
 };
 
 export function useNotes(folder?: string | null) {
@@ -48,6 +50,15 @@ export function useNoteLinks(noteId: string | undefined) {
   return useQuery({
     queryKey: noteKeys.links(noteId ?? ''),
     queryFn: () => (noteId ? getNoteLinks(noteId) : []),
+    enabled: Boolean(noteId),
+  });
+}
+
+/** Bu nota işaret eden notlar. */
+export function useBacklinks(noteId: string | undefined) {
+  return useQuery({
+    queryKey: noteKeys.backlinks(noteId ?? ''),
+    queryFn: () => (noteId ? getBacklinks(noteId) : []),
     enabled: Boolean(noteId),
   });
 }

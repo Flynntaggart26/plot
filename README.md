@@ -30,6 +30,8 @@ Plot is a local-first productivity mobile application designed for ADHD-friendly
 - **Today-first**: A single screen showing what matters right now — energy level, must-dos (max 3), open tasks, and a 07:00–23:00 timeline with a live "now" line.
 - **Must-do rule**: At most 3 open must-dos at any time. This forces prioritization and prevents overwhelm.
 - **Quick capture**: A centered FAB opens a sheet to capture a task, a note, or an idea without navigation friction. Notes and ideas get their own full screens; ideas start as sparks and can be saved, committed, or archived later.
+- **Plan that moves**: A seven-column week view with real drag-and-drop. Drag a task from the "unplanned" tray into a day, drag it between days, or drop it back to unplan it. The month grid opens the week on the day you tap.
+- **Notes that connect**: `[[Başlık]]` links resolve to real notes. Unresolved links become one-tap "create this note" actions, every note lists its backlinks, and Turkish-aware search covers both titles and bodies.
 - **Zero friction**: Works fully offline with SQLite on-device. No sign-up, no tracking, no cloud.
 
 ## Tech Stack
@@ -48,7 +50,7 @@ Plot is a local-first productivity mobile application designed for ADHD-friendly
 | Fonts | [Inter](https://rsms.me/inter/) + [Instrument Serif](https://fonts.google.com/specimen/Instrument+Serif) | Design system typography |
 | Language | TypeScript 6 | Type safety across the codebase |
 
-## Features (Week 1 — Shipped)
+## Features (0.3.0 — Shipped)
 
 ### Today (`/`)
 - **Energy selector**: Persisted 1–5 subjective energy level for the day.
@@ -63,6 +65,21 @@ Plot is a local-first productivity mobile application designed for ADHD-friendly
 - **Audit log**: Every status change is written to `task_events` for future statistics/undo.
 - **Optimistic UI**: Toggles update immediately via TanStack Query; roll back on error.
 
+### Plan (`/plan`)
+- **Week view**: Seven day columns show planned tasks, energy dots, intentions and the day's completed count. A bottom tray lists open tasks that are unplanned or live outside the visible week.
+- **Real drag-and-drop**: Column geometry is measured once at drag start; the preview follows the pointer in a root-level overlay so the horizontal scroll view can't clip it. Scrolling locks while dragging.
+- **Long-press to move, tap to pick**: Scheduled cards need a short hold before they lift, so tapping still opens the task. Source cards drag immediately; tapping one opens the seven-day picker sheet.
+- **Day picker**: A sheet lists the visible week with "Bugün"/"Yarın" badges — a fallback for trackpads and touch-less setups.
+- **Month view**: A real six-week grid with per-day load dots; tapping a day switches to the week view, scrolled to that day.
+
+### Notes (`/notes`)
+- **Read first, edit second**: Note detail opens in reading mode so links stay clickable; "Düzenle" swaps in the editor, and saving returns to reading mode with a toast instead of leaving the screen.
+- **`[[wikilink]]` graph**: Links are synced inside a transaction when a note is saved. Renaming or creating a note resolves dangling links automatically, and each note lists outgoing links plus backlinks.
+- **Create from a link**: An unresolved link is never clickable by accident — it renders faint with a dashed underline, and the links section offers a one-tap "create this note" chip.
+- **Markdown-lite rendering**: Headings, bullets, numbered lists, quotes, bold, inline code and links render without pulling in a markdown dependency.
+- **Turkish-aware search**: Case- and accent-insensitive search over titles and bodies (`ı`/`i`, `İ`/`i`), with a matching-line excerpt.
+- **Insert links while writing**: "Bağlantı ekle" opens a searchable note picker and inserts `[[Başlık]]` at the caret.
+
 ### Database (SQLite + Drizzle)
 15 tables: `areas`, `projects`, `tasks`, `task_events`, `focus_sessions`, `notes`, `note_links`, `tags`, `note_tags`, `ideas`, `daily_plans`, `chat_threads`, `chat_messages`, `ai_runs`, `settings`.
 - Idempotent seed (Inbox area + project, default settings).
@@ -74,10 +91,10 @@ Plot is a local-first productivity mobile application designed for ADHD-friendly
 - **Confirmation toasts**: Save, update and delete actions confirm in a short pill above the tab bar instead of leaving the screen silent.
 - **Motion with an off switch**: Warm metal sheen, a sliding tab lamp and animated check circles carry state changes; every decorative animation disappears when the OS "reduce motion" preference is on.
 
-### Deferred (Week 2+)
+### Deferred (0.4.0+)
 - Focus screen: live timer + Skia ring progress.
-- Notes: resolving `[[wikilink]]` targets into a graph view.
-- Plan screen: day/week/month views.
+- Notes: graph view and full-text index for large libraries.
+- Plan: week-level capacity warnings.
 - Share-to-Plot intent (needs native module + dev build).
 
 ---
@@ -237,9 +254,9 @@ All user-facing strings are in Turkish (`Günaydın`, `Bugünün Görevleri`, `M
 | Phase | Focus |
 |-------|-------|
 | Week 1 | ✅ Tasks + Today (shipped) |
-| Week 2 | Plan view (day/week/month) |
+| Week 2 | Plan drag-and-drop + month view (shipped in 0.3.0) |
 | Week 3 | Focus timer (Skia ring) |
-| Week 4 | Notes editor |
+| Week 4 | Linked notes + backlinks + search (shipped in 0.3.0) |
 | Week 5 | Data export/import (`.md` backup) |
 | Week 6 | AI assistant (Muse) |
 | Week 7 | Tangent idea capture |

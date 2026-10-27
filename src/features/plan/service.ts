@@ -1,7 +1,14 @@
 import { and, desc, eq, gte, lt, or, sql } from 'drizzle-orm';
 import { getDb } from '@/db/client';
 import { dailyPlans, tasks, type Task } from '@/db/schema';
-import { addLocalDays, dateFromDayKey, dayBounds, localDayKey } from '@/lib/date';
+import {
+  addLocalDays,
+  dateFromDayKey,
+  dayBounds,
+  localDayKey,
+  monthStartKey,
+  weekStartKey,
+} from '@/lib/date';
 
 export type WeekView = {
   weekStart: string; // YYYY-MM-DD (Monday)
@@ -23,22 +30,6 @@ export type MonthView = {
   monthStart: string; // YYYY-MM-01
   weeks: WeekView[];
 };
-
-/** ISO hafta başlangıcı (Pazartesi) */
-export function weekStartKey(date: Date = new Date()): string {
-  const d = new Date(date);
-  const day = d.getDay(); // 0=Sun, 1=Mon...
-  const diff = day === 0 ? -6 : 1 - day; // Pazartesi'ye git
-  d.setDate(d.getDate() + diff);
-  return localDayKey(d);
-}
-
-/** Ay başlangıcı */
-export function monthStartKey(date: Date = new Date()): string {
-  const d = new Date(date);
-  d.setDate(1);
-  return localDayKey(d);
-}
 
 /** Hafta planı getir (7 gün) */
 export function getWeekPlan(weekStart: string = weekStartKey()): WeekView {
@@ -86,24 +77,35 @@ export function getWeekPlan(weekStart: string = weekStartKey()): WeekView {
       .orderBy(desc(sql`${tasks.completedAt}`))
       .all();
 
-    // Bugünün tüm açık görevleri (must-do + scheduled + inbox)
-    const allOpen = db
+    // Teslim tarihi bu güne düşen açık görevler. `dueAt` iki biçimde
+    // saklanabilir: tam ISO-8601 zaman ya da yalnızca gün anahtarı.
+    const dueOpen = db
       .select()
       .from(tasks)
       .where(
-        or(
-          and(gte(tasks.scheduledAt, bounds.start), lt(tasks.scheduledAt, bounds.end)),
-          and(eq(tasks.priority, 1), eq(tasks.status, 'open')),
+        and(
+          eq(tasks.status, 'open'),
+          or(
+            and(gte(tasks.dueAt, bounds.start), lt(tasks.dueAt, bounds.end)),
+            eq(tasks.dueAt, dayKey),
+          ),
         ),
       )
-      .orderBy(desc(tasks.priority), sql`${tasks.sortOrder}`)
       .all();
+
+    // Günün yükü: planlanan + teslim tarihi bugün olan. Aynı görev iki
+    // koşula da uyabilir; kimliğe göre tekilleştirilir.
+    const dayTasks = new Map<string, Task>();
+    for (const task of [...scheduledOpen, ...dueOpen]) dayTasks.set(task.id, task);
+    const merged = [...dayTasks.values()].sort(
+      (a, b) => b.priority - a.priority || a.sortOrder - b.sortOrder,
+    );
 
     days.push({
       date: dayKey,
       energy: plan?.energy ?? null,
       intention: plan?.intention ?? null,
-      tasks: allOpen,
+      tasks: merged,
       scheduledOpen,
       completed,
     });

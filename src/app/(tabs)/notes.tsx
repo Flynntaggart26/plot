@@ -3,6 +3,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  TextInput,
   View,
   type ViewStyle,
 } from 'react-native';
@@ -18,6 +19,7 @@ import { useTheme } from '@/ui/theme';
 import { usePressScale, useReduceMotion } from '@/ui/motion/hooks';
 import { haptic } from '@/lib/haptics';
 import { useNotes } from '@/features/notes/queries';
+import { searchNoteList } from '@/features/notes/link-utils';
 import type { Note } from '@/db/schema';
 import { space as sp } from '@/ui/tokens';
 
@@ -27,9 +29,10 @@ import { space as sp } from '@/ui/tokens';
  * davranışı doğmaz.
  */
 export default function NotesScreen() {
-  const { c } = useTheme();
+  const { c, radius: rad } = useTheme();
   const reduced = useReduceMotion();
   const { data: notes, isLoading } = useNotes();
+  const [query, setQuery] = useState('');
 
   const sortedNotes = useMemo(() => {
     if (!notes) return [];
@@ -37,6 +40,9 @@ export default function NotesScreen() {
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
     );
   }, [notes]);
+
+  const results = useMemo(() => searchNoteList(sortedNotes, query), [sortedNotes, query]);
+  const searching = query.trim().length > 0;
 
   if (isLoading) {
     return (
@@ -85,27 +91,90 @@ export default function NotesScreen() {
     <Screen>
       <ScreenIntro
         title="Notlar"
-        subtitle={sortedNotes.length + ' not · [[Başlık]] ile bağlantı kurabilirsiniz'}
+        subtitle={
+          searching
+            ? `${results.length} sonuç · "${query.trim()}"`
+            : sortedNotes.length + ' not · [[Başlık]] ile bağlantı kurabilirsiniz'
+        }
       />
 
-      <ScrollView
-        contentContainerStyle={{
-          paddingHorizontal: sp.lg,
-          paddingBottom: sp.xxl,
+      <View
+        style={{
+          marginHorizontal: sp.lg,
+          marginTop: sp.sm,
+          marginBottom: sp.xs,
+          flexDirection: 'row',
+          alignItems: 'center',
           gap: sp.xs,
+          paddingHorizontal: sp.sm,
+          backgroundColor: c.surface,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: c.border,
+          borderRadius: rad.md,
         }}
       >
-        {sortedNotes.map((note, index) => (
-          <Animated.View
-            key={note.id}
-            entering={
-              reduced ? undefined : FadeInDown.duration(240).delay(Math.min(index, 6) * 40)
-            }
+        <Ionicons name="search" size={16} color={c.textFaint} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Notlarda ara"
+          placeholderTextColor={c.textFaint}
+          selectionColor={c.accent}
+          accessibilityLabel="Notlarda ara"
+          style={{
+            flex: 1,
+            paddingVertical: sp.sm,
+            color: c.text,
+            fontSize: 15,
+          }}
+        />
+        {searching ? (
+          <Pressable
+            onPress={() => setQuery('')}
+            accessibilityRole="button"
+            accessibilityLabel="Aramayı temizle"
+            style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}
           >
-            <NoteRow note={note} />
-          </Animated.View>
-        ))}
-      </ScrollView>
+            <Ionicons name="close-circle" size={18} color={c.textFaint} />
+          </Pressable>
+        ) : null}
+      </View>
+
+      {searching && results.length === 0 ? (
+        <EmptyState
+          icon={<Ionicons name="search-outline" size={28} color={c.textFaint} />}
+          headline="Eşleşme yok"
+          hint="Başlıkta ya da gövdede geçen başka bir kelime deneyin."
+          action={
+            <Button
+              label="Aramayı temizle"
+              variant="secondary"
+              icon="close-outline"
+              onPress={() => setQuery('')}
+            />
+          }
+        />
+      ) : (
+        <ScrollView
+          contentContainerStyle={{
+            paddingHorizontal: sp.lg,
+            paddingBottom: sp.xxl,
+            gap: sp.xs,
+          }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {results.map(({ note, excerpt }, index) => (
+            <Animated.View
+              key={note.id}
+              entering={
+                reduced ? undefined : FadeInDown.duration(240).delay(Math.min(index, 6) * 40)
+              }
+            >
+              <NoteRow note={note} excerpt={searching ? excerpt : null} />
+            </Animated.View>
+          ))}
+        </ScrollView>
+      )}
 
       <Button
         label="Yeni Not"
@@ -119,7 +188,7 @@ export default function NotesScreen() {
   );
 }
 
-function NoteRow({ note }: { note: Note }) {
+function NoteRow({ note, excerpt }: { note: Note; excerpt: string | null }) {
   const { c, radius: rad } = useTheme();
   const { style, handlers } = usePressScale();
   const [hovered, setHovered] = useState(false);
@@ -159,9 +228,15 @@ function NoteRow({ note }: { note: Note }) {
             <AppText variant="bodyStrong" numberOfLines={1}>
               {note.title}
             </AppText>
-            <AppText variant="meta" muted>
-              {new Date(note.updatedAt).toLocaleDateString('tr-TR')}
-            </AppText>
+            {excerpt ? (
+              <AppText variant="meta" muted numberOfLines={1}>
+                {excerpt}
+              </AppText>
+            ) : (
+              <AppText variant="meta" muted>
+                {new Date(note.updatedAt).toLocaleDateString('tr-TR')}
+              </AppText>
+            )}
           </View>
           <Ionicons name="chevron-forward" size={16} color={hovered ? c.textMuted : c.textFaint} />
         </View>

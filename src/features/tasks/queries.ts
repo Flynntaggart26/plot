@@ -7,6 +7,7 @@ import {
   deleteTask,
   getTask,
   listDayTasks,
+  listOpenTasks,
   reopenTask,
   updateTask,
   type CreateTaskInput,
@@ -28,12 +29,21 @@ export const taskKeys = {
   dayRoot: ['tasks', 'day'] as const,
   day: (dayKey: string) => ['tasks', 'day', dayKey] as const,
   detail: (id: string) => ['tasks', 'detail', id] as const,
+  open: ['tasks', 'open'] as const,
 };
 
 export function useDayTasks(dayKey: string = localDayKey()) {
   return useQuery({
     queryKey: taskKeys.day(dayKey),
     queryFn: () => listDayTasks(dayKey),
+  });
+}
+
+/** Plan kaynak paneli: hafta dışında kalan tüm açık görevler. */
+export function useOpenTasks() {
+  return useQuery({
+    queryKey: taskKeys.open,
+    queryFn: () => listOpenTasks(),
   });
 }
 
