@@ -32,7 +32,7 @@ Bugünkü durum:
 
 **Kaynak panel ("Planlanmamış")**
 
-- Bugünün planlanmamış açık görevleri yatay şeritte listelenir.
+- Bugünün **must-do + açık** görevlerinden planlanmamış olanlar yatay şeritte listelenir (tekrarlar `id`'ye göre ayıklanır; mevcut kod yalnızca `open` okuyor, bu yüzden must-do'lar panelde hiç görünmüyor).
 - Karttan sürükleyip hafta kolonuna bırakma → `useScheduleTask`.
 - Sürükleme sırasında hedef kolon: vurgu çerçevesi + içindeki bırakma alanı accent zemini.
 - Geçerli bir güne bırakılmazsa kart yayla geri döner (`spring.snappy`), haptik yok.
@@ -43,13 +43,23 @@ Bugünkü durum:
 - Uzun basıp sürükleme (250 ms) → başka güne taşıma; aynı güne bırakma no-op.
 - "Planlanmamış" paneline bırakma → `useUnscheduleTask`.
 - Karta tıklama → `/task/[id]` görev detayı.
-- Soldaki onay kutusu → `useToggleTask`; kolonun "✓ n tamamlandı" bölümü anında güncellenir.
+- Soldaki onay kutusu → `useToggleTask`; ardından `planKeys.all` invalidasyonu. Kolonun "✓ n tamamlandı" bölümü anında güncellenir.
 - Mevcut `×` düğmesi planlamayı kaldırmaya devam eder (erişilebilir yol).
 
 **Geri bildirim**
 
 - Sürükleme başında haptik `tick`, başarılı bırakmada `light`.
 - Toast kullanılmaz: kartın yer değiştirmesi yeterli geri bildirim.
+
+**Yerleşim**
+
+- Kaynak panel her zaman görünür kalmalı: hafta şeridi kalan yüksekliği alır (`flex: 1`, `minHeight: 0`), panel alt güvenli alanın üstünde durur. Aksi hâlde sürükleme hedefi ekran dışında kalır.
+
+**Erişilebilirlik**
+
+- Kaynak kart: `accessibilityLabel="Görevi planla: <başlık>"`, `accessibilityHint="Gün seçmek için aç"`.
+- Planlanmış kart: `accessibilityLabel="<başlık>, <gün> <saat>"`, taşıma ipucu; onay kutusu ayrı `accessibilityRole="checkbox"`.
+- Sürükleme hiçbir zaman tek yol değil: gün seçim sheet'i ve `×` düğmesi klavye/ekran okuyucu için yeterli.
 
 ### 3.2 Sürükleme tekniği
 
@@ -107,7 +117,7 @@ Yeni tablo veya migration yok; mevcut `note_links` (+ index'ler) kullanılır.
 - `extractWikiLinks` ile başlıkları çıkarır.
 - Boşları atar, `trim` sonrası büyük/küçük harf duyarsız tekilleştirir (ilk yazım korunur).
 - Tek transaction içinde: kaynağa ait eski `note_links` satırlarını siler, yenilerini ekler.
-- Hedef çözümleme: `notes` içinde `lower(trim(title))` eşleşmesi; birden fazla varsa en son güncellenen seçilir. Kendi notuna verilen link `resolvedId = noteId` olarak saklanır ama backlink listesinde gösterilmez.
+- Hedef çözümleme: notlar bellekte normalize edilmiş başlıkla karşılaştırılır (bkz. 4.2; SQLite `lower()` Türkçe `İ` harfini katlamaz); birden fazla eşleşme varsa en son güncellenen seçilir. Kendi notuna verilen link `resolvedId = noteId` olarak saklanır ama backlink listesinde gösterilmez.
 
 ### 4.2 `resolveDanglingLinks(noteId, title)`
 
@@ -144,6 +154,7 @@ Yeni tablo veya migration yok; mevcut `note_links` (+ index'ler) kullanılır.
   - `> ` → sol accent çizgili alıntı
   - boş satır → blok arası boşluk
   - satır içi: `**kalın**`, `` `kod` ``, `[[başlık]]`
+  - Satır içi ayrıştırma tek geçişli tokenizer ile yapılır; iç içe biçim (ör. kalın içinde link) desteklenmez, en dıştaki kalıp kazanır.
 - `[[başlık]]`:
   - hedef varsa `c.accent` renkli, altı çizili çip; tıklayınca `router.push('/note/[id]')`.
   - hedef yoksa `c.textFaint`, kesikli alt çizgi; **tıklama not oluşturmaz** (yanlışlıkla not açmayı önler). Erişilebilirlik etiketi "bağlantı hedefi yok".
@@ -155,7 +166,7 @@ Yeni tablo veya migration yok; mevcut `note_links` (+ index'ler) kullanılır.
 - Kaydet → `useUpdateNote` → toast "Not güncellendi" → okuma moduna dön (köke dönmez).
 - Yeni not (`/note/new`) akışı değişmez: kaydet → toast → `dismissToRoot`.
 - Editörün gövde alanının altında **Bağlantı ekle** düğmesi:
-  - Aranabilir not listesi sheet'i açar.
+  - Aranabilir not listesi sheet'i açar: ekranı kaplayan hafif karartma + alt panel (`c.surfaceRaised`, `radius.sheet`), mevcut yakalama sheet'i diliyle aynı; panelde arama alanı ve not satırları, üstte "Bağlantı ekle" başlığı.
   - Seçilen başlık, imlecin son konumuna `[[Başlık]]` olarak eklenir; imleç linkin sonuna taşınır.
   - İmleç konumu `onSelectionChange` ile tutulur; hiç dokunulmadıysa gövdenin sonuna eklenir.
   - Aynı başlık zaten varsa ikinci kez eklenmez; toast "Zaten bağlı".
@@ -194,6 +205,8 @@ Kod kontrolleri:
 - Dev sunucuda (Metro 8081 + COOP proxy 8082) açık ve koyu temada Plan/Ay/Not ekranları; konsol hatası olmamalı.
 
 Paketlenmiş uygulama (CDP, gerçek fare olayları):
+
+- Sürükleme adımları `Input.dispatchMouseEvent` ile: `mousePressed` → 350 ms bekle (uzun basış eşiği) → kademeli `mouseMoved` → `mouseReleased`. Tek adımlı sıçrama RNGH tarafından jest olarak algılanmaz.
 
 - Mevcut 20 kontrol korunur; not detayı okuma modunda açıldığı için "prefilled" kontrolü "Düzenle → alanlar dolu" olarak güncellenir.
 - Yeni kontroller:
