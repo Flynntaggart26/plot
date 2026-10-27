@@ -16,6 +16,15 @@ function formatTime(s: number): string {
   const r = Math.floor(s % 60);
   return `${m.toString().padStart(2, '0')}:${r.toString().padStart(2, '0')}`;
 }
+
+/** İstatistik okuması ikincil: başarısız olursa ekran çalışmaya devam eder. */
+function readFocusStats() {
+  try {
+    return getFocusStats();
+  } catch {
+    return null;
+  }
+}
 export default function FocusScreen() {
   const { c, space } = useTheme();
   const [isActive, setIsActive] = useState(false);
@@ -24,9 +33,10 @@ export default function FocusScreen() {
   const sessionIdRef = useRef<string | null>(null);
   const progress = timeLeft / TOTAL_SEC;
   const dashOffset = FULL_DASH * (1 - progress);
-  // isCompleted değişince stats yenilensin (kasıtlı bağımlılık)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const stats = useMemo(() => getFocusStats(), [isCompleted]);
+  // Okuma başarısız olursa ekranı düşürmeyelim: istatistik ikincil bilgi.
+  /* eslint-disable react-hooks/exhaustive-deps -- isCompleted kasıtlı yenileme tetikleyicisi */
+  const stats = useMemo(() => readFocusStats(), [isCompleted]);
+  /* eslint-enable react-hooks/exhaustive-deps */
   useEffect(() => {
     if (!isActive) return;
     const id = setInterval(() => {
@@ -107,7 +117,11 @@ export default function FocusScreen() {
       )}
       <View style={{ marginTop: space.lg, paddingHorizontal: space.md }}>
         <Text style={{ fontSize: 12, fontWeight: '600', color: c.textMuted }}>Odak İstatistikleri</Text>
-        <Text style={{ fontSize: 14, color: c.text, marginTop: 4 }}>Toplam oturum: {stats.totalSessions} · Tamamlanan: {stats.completedSessions}</Text>
+        {stats ? (
+          <Text style={{ fontSize: 14, color: c.text, marginTop: 4 }}>Toplam oturum: {stats.totalSessions} · Tamamlanan: {stats.completedSessions}</Text>
+        ) : (
+          <Text style={{ fontSize: 13, color: c.textMuted, marginTop: 4 }}>İstatistikler okunamadı.</Text>
+        )}
       </View>
     </View>
   );
