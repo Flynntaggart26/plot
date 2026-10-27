@@ -9,6 +9,11 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Tauri (Rust)
+src-tauri/target/
+src-tauri/gen/
+portable/
+
 # Native
 .kotlin/
 *.orig.*

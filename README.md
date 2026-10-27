@@ -12,6 +12,17 @@
 
 ---
 
+## Download (Windows)
+
+The latest `.exe` is on the [Releases page](https://github.com/Flynntaggart26/plot/releases/latest).
+
+- **Installer:** `Plot_<version>_x64-setup.exe` — installs Plot and adds a Start Menu shortcut.
+- **Portable:** `Plot_<version>_x64_portable.zip` — unzip and run `Plot.exe`; no installation.
+
+Both use Microsoft Edge WebView2 (the installer downloads it automatically if it is missing). Data stays on the device in the app's local SQLite database — no account, no cloud.
+
+---
+
 ## Overview
 
 Plot is a local-first productivity mobile application designed for ADHD-friendly workflows. Instead of complex dashboards and endless lists, it focuses on:
@@ -32,6 +43,7 @@ Plot is a local-first productivity mobile application designed for ADHD-friendly
 | State | [Zustand 5](https://zustand-demo.pmnd.rs/) | Ephemeral UI state (capture sheet, etc.) |
 | Server state | [TanStack Query 5](https://tanstack.com/query/latest) | Optimistic task toggles, query caching |
 | Database | [expo-sqlite](https://docs.expo.dev/versions/latest/sdk/sqlite/) + [Drizzle ORM 0.45](https://orm.drizzle.team/) | Local SQLite storage with type-safe migrations |
+| Desktop shell | [Tauri 2](https://v2.tauri.app/) (Rust) | Windows `.exe` around the Expo web build |
 | Validation | [Zod 4](https://zod.dev/) | Runtime schema validation |
 | Fonts | [Inter](https://rsms.me/inter/) + [Instrument Serif](https://fonts.google.com/specimen/Instrument+Serif) | Design system typography |
 | Language | TypeScript 6 | Type safety across the codebase |
@@ -94,6 +106,9 @@ npm install
 | `npm run ios` | Open on iOS (Expo Go / dev build) |
 | `npm run web` | Plain web build (UI only — SQLite **will not** open) |
 | `npm run web:isolated` | Web with COEP/COOP headers on `:8082` (**required** for SQLite/web) |
+| `npm run web:export` | Static production web build into `dist/` |
+| `npm run web:preview` | Serve `dist/` with COEP/COOP headers on `:8090` |
+| `npm run desktop:build` | Build the Windows desktop app (needs Rust + VS Build Tools) |
 
 **Why `web:isolated`?**  
 `expo-sqlite` on web (wa-sqlite) requires `SharedArrayBuffer`, which the browser only enables under [cross-origin isolation](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer#sharedarraybuffer_and_cross-origin_isolation). `scripts/dev-web-isolated.mjs` proxies Metro on port `8082` and injects `Cross-Origin-Embedder-Policy: credentialless` and `Cross-Origin-Opener-Policy: same-origin` headers so the database can open.
@@ -102,6 +117,17 @@ npm install
 npm run web:isolated
 # Then open: http://localhost:8082
 ```
+
+### Windows desktop (`.exe`)
+
+The desktop app is a Tauri 2 shell around the same Expo web build; Rust only hosts the WebView and the bundled assets. `src-tauri/tauri.conf.json` sends COEP/COOP on every WebView response (`app.security.headers`), so `SharedArrayBuffer` — and therefore SQLite — works like `web:preview`.
+
+```bash
+npm run web:export      # dist/
+npm run desktop:build   # src-tauri/target/release/plot.exe + NSIS installer
+```
+
+CI builds and publishes both the NSIS installer and a portable zip: `.github/workflows/release-windows.yml` runs on `windows-latest` when a tag such as `app-v0.1.0` is pushed (or manually via **Run workflow**).
 
 ### Type Safety & Linting
 
@@ -117,6 +143,8 @@ npx expo-doctor     # diagnose dependency/config issues
 
 ```
 plot/
+├── .github/workflows/
+│   └── release-windows.yml  # Tauri build + GitHub Release (.exe)
 ├── app.json                 # Expo config (icons, splash, plugins)
 ├── babel.config.js          # Metro Babel (inline-import for .sql migrations)
 ├── metro.config.js          # Metro config (COEP/COOP headers, wasm/sql assets)
@@ -128,7 +156,12 @@ plot/
 │   └── meta/                      # Drizzle meta snapshot
 ├── scripts/
 │   ├── dev-web-isolated.mjs       # COEP/COOP proxy for web SQLite
+│   ├── serve-web.mjs              # Static dist/ server with isolation headers
 │   └── make-brand-assets.ps1      # Brand asset generator
+├── src-tauri/                     # Tauri 2 (Rust) desktop shell
+│   ├── Cargo.toml
+│   ├── tauri.conf.json            # Window, COOP/COEP headers, NSIS bundle
+│   └── src/main.rs
 ├── src/
 │   ├── app/                       # Expo Router routes (file-system navigation)
 │   │   ├── _layout.tsx            # Root layout: DB gate → migrations → stack

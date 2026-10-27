@@ -32,6 +32,7 @@
     "zustand": "^5.0.16"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.12.4",
     "@types/react": "~19.3.0",
     "babel-plugin-inline-import": "^3.0.0",
     "drizzle-kit": "^0.31.11",
@@ -45,6 +46,10 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "web:isolated": "node scripts/dev-web-isolated.mjs",
+    "web:export": "expo export --platform web",
+    "web:preview": "node scripts/serve-web.mjs",
+    "desktop:build": "tauri build",
+    "tauri": "tauri",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit"
   },
