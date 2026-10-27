@@ -24,6 +24,7 @@ export type NoteEditorProps = {
   initialBody: string;
   onSave: (values: { title: string; bodyMd: string }) => void;
   busy?: boolean;
+  error?: string | null;
 };
 
 export function NoteEditor({
@@ -32,6 +33,7 @@ export function NoteEditor({
   initialBody,
   onSave,
   busy = false,
+  error = null,
 }: NoteEditorProps) {
   const { c, space: sp, radius: rad } = useTheme();
   const { handlers } = usePressScale();
@@ -138,6 +140,21 @@ export function NoteEditor({
             style={[editorStyle, editorContainerStyle]}
           />
         </View>
+
+        {error ? (
+          <View
+            style={{
+              backgroundColor: c.surface,
+              borderColor: c.danger,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderRadius: rad.md,
+              padding: sp.md,
+            }}
+            accessibilityRole="alert"
+          >
+            <Text style={{ color: c.danger, fontSize: 13 }}>{error}</Text>
+          </View>
+        ) : null}
 
         <View style={{ gap: sp.sm }}>
           <Pressable

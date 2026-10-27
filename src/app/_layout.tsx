@@ -148,9 +148,11 @@ function MigratingStack({ database }: { database: AppDatabase }) {
           <Stack.Screen name="plan/index" />
           <Stack.Screen name="muse/index" />
           <Stack.Screen name="note/[id]" />
+          <Stack.Screen name="note/new" />
           <Stack.Screen name="task/new" />
           <Stack.Screen name="task/[id]" />
           <Stack.Screen name="tangent/[id]" />
+          <Stack.Screen name="tangent/new" />
           <Stack.Screen name="settings/index" />
           <Stack.Screen name="settings/ai" />
           <Stack.Screen name="settings/appearance" />

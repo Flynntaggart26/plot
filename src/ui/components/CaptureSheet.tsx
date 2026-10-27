@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { BackHandler, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -24,25 +24,28 @@ const TARGETS: {
   label: string;
   hint: string;
   icon: keyof typeof Ionicons.glyphMap;
-  /** Hafta 1'de yalnızca görev açık; not ve fikir ilgili haftalarda gelir. */
-  available: boolean;
 }[] = [
   {
     target: 'task',
     label: 'Görev',
     hint: 'Yapılacak bir şey',
     icon: 'checkbox-outline',
-    available: true,
   },
-  { target: 'note', label: 'Not', hint: 'Bir düşünce', icon: 'document-text-outline', available: false },
+  { target: 'note', label: 'Not', hint: 'Bir düşünce', icon: 'document-text-outline' },
   {
     target: 'idea',
     label: 'Fikir',
     hint: 'Keşfedilecek yeni bir şey',
     icon: 'bulb-outline',
-    available: false,
   },
 ];
+
+/** Her yakalama türünün açtığı tam ekran form. */
+const ROUTE_BY_TARGET: Record<CaptureTarget, Href> = {
+  task: '/task/new',
+  note: '/note/new',
+  idea: '/tangent/new',
+};
 
 /** Sheet genişliği üst sınırı: tablet ve web'de tam ekranı kaplamasın. */
 const SHEET_MAX_WIDTH = 560;
@@ -168,7 +171,6 @@ function CaptureOption({
 }) {
   const { c, space, radius } = useTheme();
   const { style: pressStyle, handlers } = usePressScale();
-  const actionable = interactive && target.available;
 
   const enterStyle = useAnimatedStyle(() => {
     const start = (index * stagger.step) / duration.slow;
@@ -186,20 +188,15 @@ function CaptureOption({
         <Pressable
           {...handlers}
           onPress={() => {
-            if (!actionable) return;
             haptic('light');
             onClose();
-            router.push('/task/new');
+            router.push(ROUTE_BY_TARGET[target.target]);
           }}
-          disabled={!actionable}
-          focusable={actionable}
-          tabIndex={actionable ? 0 : -1}
+          focusable={interactive}
+          tabIndex={interactive ? 0 : -1}
           accessible={interactive}
           accessibilityRole="button"
-          accessibilityLabel={`${target.label}: ${
-            target.available ? target.hint : 'yakında'
-          }`}
-          aria-disabled={!target.available}
+          accessibilityLabel={`${target.label}: ${target.hint}`}
           style={[
             styles.option,
             {
@@ -209,7 +206,6 @@ function CaptureOption({
               paddingVertical: space.md,
               gap: space.sm,
               marginBottom: space.sm,
-              opacity: target.available ? 1 : 0.5,
             },
           ]}
         >
@@ -221,16 +217,10 @@ function CaptureOption({
           <View style={{ flex: 1 }}>
             <AppText variant="bodyStrong">{target.label}</AppText>
             <AppText variant="meta" muted>
-              {target.available ? target.hint : 'Yakında'}
+              {target.hint}
             </AppText>
           </View>
-          {target.available ? (
-            <Ionicons name="chevron-forward" size={18} color={c.textFaint} />
-          ) : (
-            <AppText variant="meta" faint>
-              Yakında
-            </AppText>
-          )}
+          <Ionicons name="chevron-forward" size={18} color={c.textFaint} />
         </Pressable>
       </Animated.View>
     </Animated.View>
