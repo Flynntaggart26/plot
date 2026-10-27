@@ -69,11 +69,15 @@ Plot is a local-first productivity mobile application designed for ADHD-friendly
 - Single migration: `drizzle/0000_medical_whizzer.sql`.
 - Timestamps stored as ISO-8601 UTC; day filtering uses local-day bounds (`YYYY-MM-DD`).
 
+### Desktop niceties
+- **Keyboard capture**: `N` for a new note, `I` for an idea, `T` for a task, `C` for the capture sheet, and `⌘/Ctrl+K` from anywhere. Shortcuts stay out of the way while you type.
+- **Confirmation toasts**: Save, update and delete actions confirm in a short pill above the tab bar instead of leaving the screen silent.
+- **Motion with an off switch**: Warm metal sheen, a sliding tab lamp and animated check circles carry state changes; every decorative animation disappears when the OS "reduce motion" preference is on.
+
 ### Deferred (Week 2+)
 - Focus screen: live timer + Skia ring progress.
-- Notes screen: linked note graph with `[[wikilink]]` support.
+- Notes: resolving `[[wikilink]]` targets into a graph view.
 - Plan screen: day/week/month views.
-- Settings: appearance, AI provider, data export/import.
 - Share-to-Plot intent (needs native module + dev build).
 
 ---
@@ -127,7 +131,7 @@ npm run web:export      # dist/
 npm run desktop:build   # src-tauri/target/release/plot.exe + NSIS installer
 ```
 
-CI builds and publishes both the NSIS installer and a portable zip: `.github/workflows/release-windows.yml` runs on `windows-latest` when a tag such as `app-v0.1.1` is pushed (or manually via **Run workflow**).
+CI builds and publishes both the NSIS installer and a portable zip: `.github/workflows/release-windows.yml` runs on `windows-latest` when a tag such as `app-v*` is pushed (or manually via **Run workflow**).
 
 ### Type Safety & Linting
 
