@@ -31,6 +31,12 @@ export type ColorTokens = {
   danger: string;
   /** Overlay / karartma */
   scrim: string;
+  /** Parlama bandı: metal üzerinde kayan ışık */
+  sheen: string;
+  /** Kart/buton üst kenarındaki ince ışık çizgisi */
+  edge: string;
+  /** Gradyan zeminler için vurgunun çok açık hâli */
+  accentGlow: string;
 };
 
 export const color = {
@@ -51,6 +57,9 @@ export const color = {
     warning: '#D9A441',
     danger: '#E5675C',
     scrim: '#000000AA',
+    sheen: '#FFF4DC',
+    edge: '#FFFFFF1F',
+    accentGlow: '#E8A33D1F',
   } satisfies ColorTokens,
   light: {
     bg: '#FAF8F5',
@@ -70,6 +79,9 @@ export const color = {
     warning: '#94621A',
     danger: '#C24B41',
     scrim: '#1B191766',
+    sheen: '#FFFFFF',
+    edge: '#94621A14',
+    accentGlow: '#94621A12',
   } satisfies ColorTokens,
 };
 

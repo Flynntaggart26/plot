@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import { Platform, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 import { useTheme } from '../theme';
 import { AppText } from './Screen';
 import { fontFaceFor } from '../tokens';
@@ -82,6 +82,8 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: StyleSheet.hairlineWidth,
     textAlignVertical: 'center',
+    // Tarayıcının siyah odak halkası yerine kendi vurgu çerçevemiz kullanılır.
+    ...(Platform.OS === 'web' ? { outlineStyle: 'none' as unknown as 'solid' } : null),
   },
   multiline: {
     textAlignVertical: 'top',

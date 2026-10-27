@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TextProps, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme';
 import { fontFaceFor, type TypeName, type TypeRole } from '../tokens';
 
@@ -17,6 +18,7 @@ export function Screen({
   children,
   inset = true,
   bottomInset = false,
+  ambient = true,
   style,
   contentStyle,
 }: {
@@ -25,6 +27,8 @@ export function Screen({
   inset?: boolean;
   /** true: alt güvenli alanı da ekle (sekme dışı ekranlar) */
   bottomInset?: boolean;
+  /** Üstte çok hafif bir vurgu ışığı; içerik düz zeminde yüzmesin. */
+  ambient?: boolean;
   style?: ViewStyle;
   contentStyle?: ViewStyle;
 }) {
@@ -33,6 +37,15 @@ export function Screen({
 
   return (
     <View style={[{ flex: 1, backgroundColor: c.bg }, style]}>
+      {ambient ? (
+        <LinearGradient
+          pointerEvents="none"
+          colors={[c.accentGlow, 'transparent']}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={styles.ambient}
+        />
+      ) : null}
       <View
         style={[
           styles.content,
@@ -148,5 +161,12 @@ export function AppText({
 const styles = StyleSheet.create({
   content: {
     flex: 1,
+  },
+  ambient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 260,
   },
 });
