@@ -99,3 +99,21 @@ export function minutesOfDay(iso: string): number {
 export function isSameLocalDay(a: Date, b: Date): boolean {
   return localDayKey(a) === localDayKey(b);
 }
+
+// ─── Hafta / Ay yardımcıları ──────────────────────────────────────────────────
+
+/** ISO hafta başlangıcı (Pazartesi) — YYYY-MM-DD */
+export function weekStartKey(date: Date = new Date()): string {
+  const d = new Date(date);
+  const day = d.getDay(); // 0=Sun, 1=Mon...
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return localDayKey(d);
+}
+
+/** Ay başlangıcı — YYYY-MM-DD */
+export function monthStartKey(date: Date = new Date()): string {
+  const d = new Date(date);
+  d.setDate(1);
+  return localDayKey(d);
+}
