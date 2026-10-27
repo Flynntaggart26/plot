@@ -1,50 +1,189 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  type TextStyle,
+  type ViewStyle,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Screen, ScreenIntro, AppText } from '@/ui/components/Screen';
-import { EmptyState } from '@/ui/components/EmptyState';
-import { useTheme } from '@/ui/theme';
 
-/**
- * Notes: bağlantılı not ağı. Hafta 0: liste iskeleti.
- * Arama henüz yok — çalışmayan bir input göstermek yerine niyeti açıkça yazar.
- */
+import { Screen, ScreenIntro } from '@/ui/components/Screen';
+import { EmptyState } from '@/ui/components/EmptyState';
+import { Button } from '@/ui/components/Button';
+import { useTheme } from '@/ui/theme';
+import { haptic } from '@/lib/haptics';
+import { useNotes, useCreateNote, useUpdateNote } from '@/features/notes/queries';
+import { NoteEditor } from '@/features/notes/NoteEditor';
+import type { Note } from '@/db/schema';
+import { space as sp } from '@/ui/tokens';
+
 export default function NotesScreen() {
-  const { c, space, radius } = useTheme();
+  const { c, radius: rad } = useTheme();
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [newNoteOpen, setNewNoteOpen] = useState(false);
+
+  const { data: notes, isLoading } = useNotes();
+  const createNote = useCreateNote();
+  const updateNote = useUpdateNote(editingNote?.id ?? '');
+
+  const handleSave = useCallback(
+    (values: { title: string; bodyMd: string }) => {
+      createNote.mutate(values, {
+        onSuccess: () => {
+          setNewNoteOpen(false);
+          haptic('success');
+        },
+      });
+    },
+    [createNote],
+  );
+
+  const handleUpdate = useCallback(
+    (values: { title: string; bodyMd: string }) => {
+      if (!editingNote) return;
+      updateNote.mutate(values, {
+        onSuccess: () => {
+          setEditingNote(null);
+          haptic('success');
+        },
+      });
+    },
+    [editingNote, updateNote],
+  );
+
+  const openEditor = (note: Note | null) => {
+    haptic('light');
+    setEditingNote(note ?? null);
+  };
+
+  const sortedNotes = useMemo(() => {
+    if (!notes) return [];
+    return [...notes].sort(
+      (a, b) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    );
+  }, [notes]);
+
+  if (isLoading) {
+    return (
+      <Screen>
+        <ScreenIntro title="Notlar" subtitle="Notlar\u00fcnuz y\u00fckleniyor..." />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: c.textMuted }}>Y\u00fckleniyor...</Text>
+        </View>
+      </Screen>
+    );
+  }
+
+  const noteRowStyle: ViewStyle = {
+    paddingVertical: sp.xs,
+    paddingHorizontal: sp.lg,
+  };
+
+  const noteRowContentStyle: ViewStyle = {
+    flexDirection: 'row' as const,
+    alignItems: 'center',
+    gap: sp.sm,
+    paddingVertical: sp.sm,
+    paddingHorizontal: sp.md,
+    backgroundColor: c.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.border,
+    borderRadius: rad.md,
+  };
+
+  const noteRowTextStyle: ViewStyle = {
+    flex: 1,
+  };
+
+  const noteTitleStyle: TextStyle = {
+    fontSize: 16,
+    fontWeight: '600',
+    color: c.text,
+  };
+
+  const noteMetaStyle: TextStyle = {
+    fontSize: 12,
+    color: c.textMuted,
+    marginTop: 2,
+  };
 
   return (
     <Screen>
-      <ScreenIntro title="Notes" subtitle="Düşüncelerin birbirine ne kadar bağlı?" />
-
-      <View
-        accessible
-        accessibilityLabel="Arama yakında: başlık, gövde ve bağlantılarda arama"
-        style={{
-          marginTop: space.md,
-          height: 44,
-          borderRadius: radius.md,
-          backgroundColor: c.surface,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: c.border,
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: space.sm,
-          gap: space.xs,
-        }}
-      >
-        <Ionicons name="search-outline" size={16} color={c.textFaint} />
-        <AppText variant="body" faint style={{ flex: 1 }}>
-          Ara — başlık, gövde, backlink
-        </AppText>
-        <AppText variant="meta" faint>
-          yakında
-        </AppText>
-      </View>
-
-      <EmptyState
-        headline="Not yok"
-        hint="İlk notu yakala. İkincisi geldiğinde [[bağlantı]] kurmaya hazırsın."
+      <ScreenIntro
+        title="Notlar"
+        subtitle={sortedNotes.length + ' not \u011f [[Ba\u011fl\u0131k]] ile ba\u011flant\u0131 kurabilirsiniz'}
       />
+
+      {sortedNotes.length === 0 ? (
+        <EmptyState
+          headline="Not yok"
+          hint="\u0130lk notunuzu olu\u015ftru\u015fn. \u0130kincisi geldi\u011finde [[ba\u011flant\u0131]] kurmaya ba\u015flayabilirsiniz."
+        />
+      ) : (
+        <ScrollView
+          contentContainerStyle={{
+            paddingHorizontal: sp.lg,
+            paddingBottom: sp.xxl,
+            gap: sp.xs,
+          }}
+        >
+          {sortedNotes.map((note) => (
+            <TouchableOpacity
+              key={note.id}
+              onPress={() => openEditor(note)}
+              accessible
+              accessibilityRole="link"
+              accessibilityLabel={note.title}
+              style={noteRowStyle}
+            >
+              <View style={noteRowContentStyle}>
+                <Ionicons name="document-text-outline" size={20} color={c.textMuted} />
+                <View style={noteRowTextStyle}>
+                  <Text style={[noteTitleStyle, { color: c.text }]}>
+                    {note.title}
+                  </Text>
+                  <Text style={[noteMetaStyle, { color: c.textMuted }]}>
+                    {new Date(note.updatedAt).toLocaleDateString('tr-TR')}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={c.textFaint} />
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+
+      <Button
+        label="Yeni Not"
+        icon="create-outline"
+        onPress={() => {
+          haptic('medium');
+          setNewNoteOpen(true);
+        }}
+      />
+
+      {newNoteOpen && (
+        <NoteEditor
+          initialTitle=""
+          initialBody=""
+          onSave={handleSave}
+          busy={createNote.isPending}
+        />
+      )}
+
+      {editingNote && (
+        <NoteEditor
+          noteId={editingNote.id}
+          initialTitle={editingNote.title}
+          initialBody={editingNote.bodyMd}
+          onSave={handleUpdate}
+          busy={updateNote.isPending}
+        />
+      )}
     </Screen>
   );
 }
