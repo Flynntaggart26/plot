@@ -275,7 +275,7 @@ function Fab({ onPress }: { onPress: () => void }) {
         pointerEvents="none"
         style={[
           styles.fabHalo,
-          { backgroundColor: alpha(c.accent, dark ? 0.34 : 0.18), borderRadius: radius.pill },
+          { backgroundColor: alpha(c.accent, dark ? 0.28 : 0.16), borderRadius: radius.pill },
           haloStyle,
         ]}
       />

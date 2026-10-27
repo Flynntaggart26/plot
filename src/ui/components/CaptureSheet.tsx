@@ -143,7 +143,7 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
         >
           <LinearGradient
             pointerEvents="none"
-            colors={[alpha(c.accent, 0.14), 'transparent']}
+            colors={[alpha(c.accent, 0.1), 'transparent']}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
             style={styles.sheetGlow}
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 180,
+    height: 150,
   },
   sheetEdge: {
     position: 'absolute',
