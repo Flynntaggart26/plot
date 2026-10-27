@@ -1,9 +1,7 @@
 import React, { useRef, useState } from 'react';
-import { usePressScale } from '@/ui/motion/hooks';
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,10 +11,9 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/ui/theme';
+import { Button } from '@/ui/components/Button';
 import { haptic } from '@/lib/haptics';
-
 
 export type NoteEditorProps = {
   noteId?: string;
@@ -27,8 +24,12 @@ export type NoteEditorProps = {
   error?: string | null;
 };
 
+/**
+ * Not editörü. Alanlar odaklandığında çerçeve vurguya döner; kaydetme
+ * butonu diğer birincil eylemlerle aynı bileşeni kullanır ki parlama,
+ * basış ve yükleme davranışı tek yerden gelsin.
+ */
 export function NoteEditor({
-  noteId,
   initialTitle,
   initialBody,
   onSave,
@@ -36,12 +37,10 @@ export function NoteEditor({
   error = null,
 }: NoteEditorProps) {
   const { c, space: sp, radius: rad } = useTheme();
-  const { handlers } = usePressScale();
   const [title, setTitle] = useState(initialTitle);
   const [body, setBody] = useState(initialBody);
+  const [focused, setFocused] = useState<'title' | 'body' | null>(null);
   const textRef = useRef<TextInputInstance | null>(null);
-
-
 
   const handleSave = () => {
     if (!title.trim()) {
@@ -66,23 +65,6 @@ export function NoteEditor({
     padding: sp.md,
     color: c.text,
     textAlignVertical: 'top' as const,
-  };
-
-  const saveButtonStyle: ViewStyle = {
-    flexDirection: 'row' as const,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: sp.sm,
-    paddingVertical: sp.md,
-    borderRadius: rad.pill,
-    minHeight: 56,
-    backgroundColor: c.accent,
-  };
-
-  const saveButtonTextStyle: TextStyle = {
-    color: c.bg,
-    fontWeight: '600',
-    fontSize: 16,
   };
 
   const inputContainerStyle: ViewStyle = {
@@ -120,7 +102,16 @@ export function NoteEditor({
             value={title}
             onChangeText={setTitle}
             placeholder="Not başlığı"
-            style={[inputStyle, inputContainerStyle]}
+            placeholderTextColor={c.textFaint}
+            selectionColor={c.accent}
+            onFocus={() => setFocused('title')}
+            onBlur={() => setFocused(null)}
+            style={[
+              inputStyle,
+              inputContainerStyle,
+              styles.webInput,
+              focused === 'title' && { borderColor: c.accent },
+            ]}
             autoFocus
             returnKeyType="done"
             blurOnSubmit={false}
@@ -135,9 +126,18 @@ export function NoteEditor({
             value={body}
             onChangeText={setBody}
             placeholder="Düşüncelerinizi buraya yazın... [[Başlık]] ile link ekleyebilirsiniz."
+            placeholderTextColor={c.textFaint}
+            selectionColor={c.accent}
+            onFocus={() => setFocused('body')}
+            onBlur={() => setFocused(null)}
             multiline
             numberOfLines={12}
-            style={[editorStyle, editorContainerStyle]}
+            style={[
+              editorStyle,
+              editorContainerStyle,
+              styles.webInput,
+              focused === 'body' && { borderColor: c.accent },
+            ]}
           />
         </View>
 
@@ -156,27 +156,19 @@ export function NoteEditor({
           </View>
         ) : null}
 
-        <View style={{ gap: sp.sm }}>
-          <Pressable
-            {...handlers}
-            style={[saveButtonStyle]}
-            onPress={handleSave}
-            disabled={busy || !title.trim()}
-            accessible
-            accessibilityRole="button"
-            accessibilityLabel="Notu kaydet"
-          >
-            <Ionicons
-              name={busy ? 'reload-circle' : 'checkmark-outline'}
-              size={20}
-              color={c.bg}
-            />
-            <Text style={saveButtonTextStyle}>
-              {busy ? 'Kaydediliyor...' : 'Kaydet'}
-            </Text>
-          </Pressable>
-        </View>
+        <Button
+          label={busy ? 'Kaydediliyor...' : 'Kaydet'}
+          icon={busy ? undefined : 'checkmark-outline'}
+          loading={busy}
+          disabled={!title.trim()}
+          onPress={handleSave}
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
+
+const styles = StyleSheet.create({
+  // Tarayıcının siyah odak halkası yerine kendi vurgu çerçevemiz kullanılır.
+  webInput: Platform.OS === 'web' ? { outlineStyle: 'none' as unknown as 'solid' } : {},
+});

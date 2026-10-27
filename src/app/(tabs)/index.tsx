@@ -1,10 +1,13 @@
-import React, { useMemo } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import Animated from 'react-native-reanimated';
 import { Screen, ScreenIntro, AppText } from '@/ui/components/Screen';
 import { Button } from '@/ui/components/Button';
+import { SkeletonLines } from '@/ui/components/Skeleton';
 import { useTheme } from '@/ui/theme';
+import { usePressScale } from '@/ui/motion/hooks';
 import { haptic } from '@/lib/haptics';
 import { greetingLabel, localDayKey, todayLabel } from '@/lib/date';
 import { useDayTasks, useToggleTask } from '@/features/tasks/queries';
@@ -13,7 +16,6 @@ import { TaskRow } from '@/features/tasks/TaskRow';
 import { EnergyRow } from '@/features/today/EnergyRow';
 import { Timeline } from '@/features/today/Timeline';
 import { useDayEnergy, useSetDayEnergy } from '@/features/today/queries';
-import { glow } from '@/ui/tokens';
 
 /**
  * Today — günün tek bakışta görünen hâli.
@@ -112,7 +114,7 @@ export default function TodayScreen() {
           }
         >
           {tasksQuery.isPending ? (
-            <LoadingRow />
+            <LoadingSkeleton />
           ) : data && data.mustDo.length > 0 ? (
             <TaskList data={data} list="mustDo" onToggle={onToggle} isPending={isPending} />
           ) : (
@@ -128,7 +130,7 @@ export default function TodayScreen() {
           count={data ? String(data.open.length) : '—'}
         >
           {tasksQuery.isPending ? (
-            <LoadingRow />
+            <LoadingSkeleton />
           ) : data && data.open.length > 0 ? (
             <TaskList data={data} list="open" onToggle={onToggle} isPending={isPending} />
           ) : (
@@ -140,11 +142,7 @@ export default function TodayScreen() {
         </SectionCard>
 
         {data && data.done.length > 0 ? (
-          <SectionCard
-            label="TAMAMLANANLAR"
-            count={String(data.done.length)}
-            glowing={true}
-          >
+          <SectionCard label="TAMAMLANANLAR" count={String(data.done.length)} completed>
             <TaskList data={data} list="done" onToggle={onToggle} isPending={isPending} />
           </SectionCard>
         ) : null}
@@ -167,28 +165,36 @@ function IntroShortcut({
   onPress: () => void;
 }) {
   const { c, radius } = useTheme();
+  const { style, handlers } = usePressScale();
+  const [hovered, setHovered] = useState(false);
 
   return (
-    <Pressable
-      onPress={() => {
-        haptic('tick');
-        onPress();
-      }}
-      accessible
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      style={[
-        styles.introShortcut,
-        {
-          backgroundColor: c.surface,
-          borderRadius: radius.pill,
-          borderColor: c.border,
-          borderWidth: StyleSheet.hairlineWidth,
-        },
-      ]}
-    >
-      <Ionicons name={icon} size={19} color={c.text} />
-    </Pressable>
+    <Animated.View style={style}>
+      <Pressable
+        {...handlers}
+        onPress={() => {
+          haptic('tick');
+          onPress();
+        }}
+        onHoverIn={() => setHovered(true)}
+        onHoverOut={() => setHovered(false)}
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        style={[
+          styles.introShortcut,
+          {
+            backgroundColor: hovered ? c.surfaceRaised : c.surface,
+            borderRadius: radius.pill,
+            borderColor: hovered ? c.borderStrong : c.border,
+            borderWidth: StyleSheet.hairlineWidth,
+            cursor: 'pointer',
+          },
+        ]}
+      >
+        <Ionicons name={icon} size={19} color={hovered ? c.accent : c.text} />
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -198,12 +204,16 @@ function SectionCard({
   action,
   children,
   glowing = false,
+  completed = false,
 }: {
   label: string;
   count: string;
   action?: React.ReactNode;
   children: React.ReactNode;
+  /** Vurgu çerçevesi: kart o an dolu ve öncelikli. */
   glowing?: boolean;
+  /** Tamamlanan işler: çerçeve yok, yalnızca başlık yeşile döner. */
+  completed?: boolean;
 }) {
   const { c, space, radius } = useTheme();
 
@@ -220,16 +230,17 @@ function SectionCard({
           borderRadius: radius.card,
           borderWidth: glowing ? StyleSheet.hairlineWidth : 0,
           borderColor: glowing ? c.accent : c.border,
-          ...(glowing && glow.soft),
+          overflow: 'hidden',
         },
       ]}
     >
+      <View pointerEvents="none" style={[styles.cardEdge, { backgroundColor: c.edge }]} />
       <View style={styles.cardHeader}>
         <AppText
           variant="meta"
           style={{
             letterSpacing: 1.2,
-            color: glowing ? c.focus : c.accent,
+            color: completed ? c.focus : c.accent,
             fontWeight: '600',
           }}
         >
@@ -292,13 +303,8 @@ function QuietHint({ headline, hint }: { headline: string; hint: string }) {
   );
 }
 
-function LoadingRow() {
-  const { space } = useTheme();
-  return (
-    <View style={{ paddingVertical: space.lg, alignItems: 'center' }}>
-      <ActivityIndicator />
-    </View>
-  );
+function LoadingSkeleton() {
+  return <SkeletonLines lines={2} />;
 }
 
 function ErrorBanner({
@@ -337,6 +343,13 @@ function ErrorBanner({
 const styles = StyleSheet.create({
   cardBase: {
     backgroundColor: 'transparent',
+  },
+  cardEdge: {
+    position: 'absolute',
+    top: 0,
+    left: 16,
+    right: 16,
+    height: StyleSheet.hairlineWidth * 2,
   },
   cardHeader: {
     flexDirection: 'row',

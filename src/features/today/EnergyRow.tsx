@@ -1,10 +1,17 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, {
+  interpolateColor,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { useTheme } from '@/ui/theme';
 import { AppText } from '@/ui/components/Screen';
-import { usePressScale } from '@/ui/motion/hooks';
+import { usePressScale, useReduceMotion } from '@/ui/motion/hooks';
 import { haptic } from '@/lib/haptics';
+import { alpha } from '@/ui/color';
+import { glow, spring } from '@/ui/tokens';
 
 const LEVEL_LABEL = ['Tükenmiş', 'Düşük', 'Orta', 'İyi', 'Yüksek'];
 
@@ -65,10 +72,44 @@ function EnergyPill({
   onSelect: () => void;
 }) {
   const { c, radius } = useTheme();
+  const reduced = useReduceMotion();
   const { style, handlers } = usePressScale(disabled);
+  const selectedProgress = useSharedValue(selected ? 1 : 0);
+
+  useEffect(() => {
+    if (reduced) {
+      selectedProgress.set(selected ? 1 : 0);
+      return;
+    }
+    selectedProgress.set(withSpring(selected ? 1 : 0, spring.snappy));
+  }, [reduced, selected, selectedProgress]);
+
+  // Seçim tek renkle değil, zemin + çerçeve + çok hafif büyümeyle anlatılır.
+  const pillStyle = useAnimatedStyle(() => {
+    const p = selectedProgress.get();
+    return {
+      backgroundColor: interpolateColor(p, [0, 1], [c.surface, c.accentSoft]),
+      borderColor: interpolateColor(p, [0, 1], [c.border, c.accent]),
+      transform: [{ scale: 1 + p * 0.015 }],
+    };
+  });
+
+  const haloStyle = useAnimatedStyle(() => ({
+    opacity: selectedProgress.get() * 0.9,
+    transform: [{ scale: 0.94 + selectedProgress.get() * 0.06 }],
+  }));
 
   return (
     <Animated.View style={[styles.pillWrap, style]}>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.halo,
+          glow.soft,
+          { backgroundColor: alpha(c.accent, 0.16), borderRadius: radius.pill },
+          haloStyle,
+        ]}
+      />
       <Pressable
         {...handlers}
         onPress={() => {
@@ -81,15 +122,12 @@ function EnergyPill({
         accessibilityLabel={`Enerji ${level} / 5, ${LEVEL_LABEL[level - 1]}`}
         aria-checked={selected}
         aria-disabled={disabled}
-        style={[
-          styles.pill,
-          {
-            borderRadius: radius.pill,
-            backgroundColor: selected ? c.accentSoft : c.surface,
-            borderColor: selected ? c.accent : c.border,
-          },
-        ]}
+        style={[styles.pill, { borderRadius: radius.pill, cursor: 'pointer' }]}
       >
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth }, pillStyle]}
+        />
         <AppText variant="meta" muted={!selected} style={selected ? { color: c.accent } : undefined}>
           {'•'.repeat(level)}
         </AppText>
@@ -107,10 +145,19 @@ const styles = StyleSheet.create({
   pillWrap: {
     flex: 1,
   },
+  halo: {
+    position: 'absolute',
+    top: -3,
+    bottom: -3,
+    left: -2,
+    right: -2,
+  },
   pill: {
     height: 44,
     borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
 });
