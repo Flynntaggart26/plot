@@ -29,7 +29,7 @@ Plot is a local-first productivity mobile application designed for ADHD-friendly
 
 - **Today-first**: A single screen showing what matters right now — energy level, must-dos (max 3), open tasks, and a 07:00–23:00 timeline with a live "now" line.
 - **Must-do rule**: At most 3 open must-dos at any time. This forces prioritization and prevents overwhelm.
-- **Quick capture**: A centered FAB opens a sheet to capture tasks immediately without navigation friction.
+- **Quick capture**: A centered FAB opens a sheet to capture a task, a note, or an idea without navigation friction. Notes and ideas get their own full screens; ideas start as sparks and can be saved, committed, or archived later.
 - **Zero friction**: Works fully offline with SQLite on-device. No sign-up, no tracking, no cloud.
 
 ## Tech Stack
@@ -127,7 +127,7 @@ npm run web:export      # dist/
 npm run desktop:build   # src-tauri/target/release/plot.exe + NSIS installer
 ```
 
-CI builds and publishes both the NSIS installer and a portable zip: `.github/workflows/release-windows.yml` runs on `windows-latest` when a tag such as `app-v0.1.0` is pushed (or manually via **Run workflow**).
+CI builds and publishes both the NSIS installer and a portable zip: `.github/workflows/release-windows.yml` runs on `windows-latest` when a tag such as `app-v0.1.1` is pushed (or manually via **Run workflow**).
 
 ### Type Safety & Linting
 
