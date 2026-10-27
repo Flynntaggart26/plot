@@ -7,6 +7,7 @@ import { Button } from '@/ui/components/Button';
 import { useTheme } from '@/ui/theme';
 import { haptic } from '@/lib/haptics';
 import { dismissToRoot } from '@/lib/navigation';
+import { toast } from '@/lib/toast';
 import { useDeleteNote, useNote, useUpdateNote } from '@/features/notes/queries';
 import { NoteEditor } from '@/features/notes/NoteEditor';
 import { space } from '@/ui/tokens';
@@ -31,6 +32,7 @@ export default function NoteDetail() {
       updateNote.mutate(values, {
         onSuccess: () => {
           haptic('success');
+          toast('Not güncellendi');
           dismissToRoot();
         },
         onError: (cause) => {
@@ -104,6 +106,7 @@ export default function NoteDetail() {
                   deleteNote.mutate(note.id, {
                     onSuccess: () => {
                       haptic('success');
+                      toast('Not silindi', 'info');
                       dismissToRoot();
                     },
                     onError: (cause) => {

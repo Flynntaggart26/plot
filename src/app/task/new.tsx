@@ -5,6 +5,7 @@ import { SubHeader } from '@/ui/components/SubHeader';
 import { useTheme } from '@/ui/theme';
 import { todayLabel, localDayKey } from '@/lib/date';
 import { dismissToRoot } from '@/lib/navigation';
+import { toast } from '@/lib/toast';
 import { TaskForm, type TaskFormValues } from '@/features/tasks/TaskForm';
 import { useCreateTask, useDayTasks } from '@/features/tasks/queries';
 
@@ -31,7 +32,10 @@ export default function NewTaskScreen() {
         mustDo: values.mustDo,
       },
       {
-        onSuccess: () => dismissToRoot(),
+        onSuccess: () => {
+          toast(values.mustDo ? 'Must-do eklendi' : 'Görev eklendi');
+          dismissToRoot();
+        },
         onError: (cause) => {
           setError(cause instanceof Error ? cause.message : 'Görev kaydedilemedi.');
         },

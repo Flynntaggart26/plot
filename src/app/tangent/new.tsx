@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { SubHeader } from '@/ui/components/SubHeader';
 import { useTheme } from '@/ui/theme';
 import { dismissToRoot } from '@/lib/navigation';
+import { toast } from '@/lib/toast';
 import { IdeaForm, type IdeaFormValues } from '@/features/ideas/IdeaForm';
 import { useCreateIdea } from '@/features/ideas/queries';
 
@@ -25,7 +26,10 @@ export default function NewIdeaScreen() {
         status: 'spark',
       },
       {
-        onSuccess: () => dismissToRoot(),
+        onSuccess: () => {
+          toast('Fikir yakalandı');
+          dismissToRoot();
+        },
         onError: (cause) => {
           setError(cause instanceof Error ? cause.message : 'Fikir kaydedilemedi.');
         },

@@ -4,6 +4,7 @@ import { SubHeader } from '@/ui/components/SubHeader';
 import { useTheme } from '@/ui/theme';
 import { todayLabel } from '@/lib/date';
 import { dismissToRoot } from '@/lib/navigation';
+import { toast } from '@/lib/toast';
 import { NoteEditor } from '@/features/notes/NoteEditor';
 import { useCreateNote } from '@/features/notes/queries';
 
@@ -19,7 +20,10 @@ export default function NewNoteScreen() {
   const submit = (values: { title: string; bodyMd: string }) => {
     setError(null);
     create.mutate(values, {
-      onSuccess: () => dismissToRoot(),
+      onSuccess: () => {
+        toast('Not kaydedildi');
+        dismissToRoot();
+      },
       onError: (cause) => {
         setError(cause instanceof Error ? cause.message : 'Not kaydedilemedi.');
       },

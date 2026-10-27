@@ -7,6 +7,7 @@ import { Button } from '@/ui/components/Button';
 import { useTheme } from '@/ui/theme';
 import { haptic } from '@/lib/haptics';
 import { dismissToRoot } from '@/lib/navigation';
+import { toast } from '@/lib/toast';
 import { IdeaForm, type IdeaFormValues } from '@/features/ideas/IdeaForm';
 import { useDeleteIdea, useIdea, useUpdateIdea } from '@/features/ideas/queries';
 import { IDEA_STATUS_LABELS } from '@/features/ideas/service';
@@ -38,7 +39,10 @@ export default function IdeaDetail() {
         status: values.status,
       },
       {
-        onSuccess: () => haptic('success'),
+        onSuccess: () => {
+          haptic('success');
+          toast('Fikir güncellendi');
+        },
         onError: (cause) => {
           setError(cause instanceof Error ? cause.message : 'Fikir kaydedilemedi.');
         },
@@ -106,7 +110,10 @@ export default function IdeaDetail() {
                     onPress={() => {
                       setError(null);
                       remove.mutate(idea.id, {
-                        onSuccess: () => dismissToRoot(),
+                        onSuccess: () => {
+                          toast('Fikir silindi', 'info');
+                          dismissToRoot();
+                        },
                         onError: (cause) => {
                           setError(cause instanceof Error ? cause.message : 'Fikir silinemedi.');
                         },

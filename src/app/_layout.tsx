@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, isAppearanceForcedByUrl, setAppearance, useTheme } from '@/ui/theme';
 import { BootScreen } from '@/ui/components/BootScreen';
 import { StartupError } from '@/ui/components/StartupError';
+import { ToastHost } from '@/ui/components/Toast';
+import { useKeyboardShortcuts } from '@/lib/use-shortcuts';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import * as SplashScreen from 'expo-splash-screen';
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
@@ -79,6 +81,7 @@ function DatabaseGate() {
 
 function MigratingStack({ database }: { database: AppDatabase }) {
   const { c, dark, fontReady } = useTheme();
+  useKeyboardShortcuts();
   const migration = useMigrations(database, migrations);
   const seeded = useRef(false);
   const appearanceHydrated = useRef(false);
@@ -158,6 +161,7 @@ function MigratingStack({ database }: { database: AppDatabase }) {
           <Stack.Screen name="settings/appearance" />
           <Stack.Screen name="settings/data" />
         </Stack>
+        <ToastHost />
       </Animated.View>
       <StatusBar style={dark ? 'light' : 'dark'} />
     </>

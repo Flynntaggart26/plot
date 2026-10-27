@@ -7,6 +7,7 @@ import { Button } from '@/ui/components/Button';
 import { useTheme } from '@/ui/theme';
 import { localDayKey } from '@/lib/date';
 import { dismissToRoot } from '@/lib/navigation';
+import { toast } from '@/lib/toast';
 import { TaskForm, type TaskFormValues } from '@/features/tasks/TaskForm';
 import {
   useDayTasks,
@@ -48,6 +49,9 @@ export default function TaskDetailScreen() {
         mustDo: values.mustDo,
       },
       {
+        onSuccess: () => {
+          toast('Görev güncellendi');
+        },
         onError: (cause) => {
           setError(cause instanceof Error ? cause.message : 'Görev kaydedilemedi.');
         },
@@ -108,6 +112,7 @@ export default function TaskDetailScreen() {
                 toggle.mutate(
                   { id: task.id, done: !done },
                   {
+                    onSuccess: () => toast(!done ? 'Görev tamamlandı' : 'Görev geri açıldı', 'info'),
                     onError: (cause) => {
                       setError(cause instanceof Error ? cause.message : 'Görev güncellenemedi.');
                     },
@@ -142,7 +147,10 @@ export default function TaskDetailScreen() {
                     onPress={() => {
                       setError(null);
                       remove.mutate(task.id, {
-                        onSuccess: () => dismissToRoot(),
+                        onSuccess: () => {
+                          toast('Görev silindi', 'info');
+                          dismissToRoot();
+                        },
                         onError: (cause) => {
                           setError(cause instanceof Error ? cause.message : 'Görev silinemedi.');
                         },
