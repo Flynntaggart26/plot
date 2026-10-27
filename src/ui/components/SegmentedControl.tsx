@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
+  useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
@@ -13,35 +14,44 @@ interface SegmentedControlProps {
   segments: { value: string; label: string }[];
 }
 
+/**
+ * Eşit genişlikte segment seçici. Gösterge konumu React state yerine
+ * shared value ile ilerler; genişlik ölçümü de state'e yazılır çünkü
+ * shared value tek başına yeniden render tetiklemez.
+ */
 export function SegmentedControl({ value, onChange, segments }: SegmentedControlProps) {
   const { c } = useTheme();
-  const activeIndex = segments.findIndex((s) => s.value === value);
-  const indicatorX = useSharedValue(activeIndex);
-  const containerWidth = useSharedValue(0);
+  const activeIndex = Math.max(
+    0,
+    segments.findIndex((s) => s.value === value),
+  );
+  const [width, setWidth] = useState(0);
+  const progress = useSharedValue(activeIndex);
+
+  useEffect(() => {
+    progress.set(withSpring(activeIndex, spring.snappy));
+  }, [activeIndex, progress]);
+
+  const segmentWidth = width > 0 ? (width - 6) / segments.length : 0;
+
+  const indicatorStyle = useAnimatedStyle(() => ({
+    width: segmentWidth,
+    transform: [{ translateX: progress.get() * segmentWidth }],
+  }));
 
   return (
     <View
-      onLayout={(e) => { containerWidth.value = e.nativeEvent.layout.width; }}
-      style={styles.container}
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      style={[styles.container, { backgroundColor: c.surface, borderColor: c.border }]}
     >
       <Animated.View
-        style={[
-          styles.indicator,
-          {
-            transform: [
-              { translateX: indicatorX.value * (containerWidth.value / segments.length) },
-            ],
-          },
-        ]}
+        style={[styles.indicator, { backgroundColor: c.accent }, indicatorStyle]}
       />
 
       {segments.map((segment, index) => (
         <Pressable
           key={segment.value}
-          onPress={() => {
-            indicatorX.value = withSpring(index, spring.snappy);
-            onChange(segment.value);
-          }}
+          onPress={() => onChange(segment.value)}
           style={styles.segment}
           accessibilityRole="button"
           aria-selected={index === activeIndex}
@@ -66,18 +76,16 @@ export function SegmentedControl({ value, onChange, segments }: SegmentedControl
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: '#16161A',
     borderRadius: radius.pill,
     padding: 3,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#2A2A32',
     height: 40,
   },
   indicator: {
     position: 'absolute',
     top: 3,
     bottom: 3,
-    backgroundColor: '#E8A33D',
+    left: 3,
     borderRadius: radius.pill,
     shadowColor: '#E8A33D',
     shadowOffset: { width: 0, height: 2 },
