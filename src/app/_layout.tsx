@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ThemeProvider, useTheme } from '@/ui/theme';
+import { ThemeProvider, isAppearanceForcedByUrl, setAppearance, useTheme } from '@/ui/theme';
 import { BootScreen } from '@/ui/components/BootScreen';
 import { StartupError } from '@/ui/components/StartupError';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -12,6 +12,7 @@ import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
 import { initDatabase, type AppDatabase } from '@/db/client';
 import { seedDatabase } from '@/db/seed';
+import { getAppearanceSetting } from '@/features/settings/preferences';
 import { duration } from '@/ui/tokens';
 
 // Fontlar ve veritabanı hazır olana kadar native splash ekranı kalsın.
@@ -80,6 +81,8 @@ function MigratingStack({ database }: { database: AppDatabase }) {
   const { c, dark, fontReady } = useTheme();
   const migration = useMigrations(database, migrations);
   const seeded = useRef(false);
+  const appearanceHydrated = useRef(false);
+  const [appearanceReady, setAppearanceReady] = useState(false);
 
   // Tohumlama migration'dan sonra, bir kez. Idempotent olduğu için
   // StrictMode'un çift çalıştırması da zararsızdır. Boot'u bloklamaz:
@@ -94,7 +97,25 @@ function MigratingStack({ database }: { database: AppDatabase }) {
     }
   }, [migration.success]);
 
-  const ready = fontReady && migration.success;
+  // Kayıtlı tema tercihini ilk kareden önce uygula: aksi halde koyu tema
+  // seçmiş kullanıcı bir an varsayılan temayı görür.
+  useEffect(() => {
+    if (!migration.success || appearanceHydrated.current) return;
+    appearanceHydrated.current = true;
+
+    if (!isAppearanceForcedByUrl()) {
+      try {
+        const stored = getAppearanceSetting();
+        if (stored) setAppearance(stored);
+      } catch (cause) {
+        console.warn('Görünüm tercihi okunamadı:', cause);
+      }
+    }
+
+    setAppearanceReady(true);
+  }, [migration.success]);
+
+  const ready = fontReady && migration.success && appearanceReady;
   const failed = Boolean(migration.error);
 
   useEffect(() => {
@@ -130,6 +151,7 @@ function MigratingStack({ database }: { database: AppDatabase }) {
           <Stack.Screen name="task/new" />
           <Stack.Screen name="task/[id]" />
           <Stack.Screen name="tangent/[id]" />
+          <Stack.Screen name="settings/index" />
           <Stack.Screen name="settings/ai" />
           <Stack.Screen name="settings/appearance" />
           <Stack.Screen name="settings/data" />

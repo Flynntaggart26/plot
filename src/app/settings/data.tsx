@@ -13,7 +13,7 @@ import { useTheme } from '@/ui/theme';
 import { haptic } from '@/lib/haptics';
 import { usePressScale } from '@/ui/motion/hooks';
 import { exportAllData, exportToMarkdown, importAllData } from '@/features/backup/service';
-import { Screen, ScreenIntro } from '@/ui/components/Screen';
+import { SubHeader } from '@/ui/components/SubHeader';
 import { space, radius } from '@/ui/tokens';
 
 const HAIRLINE = 1;
@@ -133,15 +133,13 @@ export default function DataScreen() {
   };
 
   return (
-    <Screen>
-      <ScreenIntro
-        title="Veri Yedekleme"
-        subtitle="Tüm verinizi JSON veya Markdown olarak dışarı aktarın, geri yükleyin."
-      />
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <SubHeader title="Veri ve Yedekleme" subtitle="Dışa ve içe aktarma" />
 
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: sp.lg,
+          paddingTop: sp.md,
           paddingBottom: sp.xxl,
           gap: sp.md,
         }}
@@ -255,6 +253,6 @@ export default function DataScreen() {
           </Pressable>
         </View>
       </ScrollView>
-    </Screen>
+    </View>
   );
 }

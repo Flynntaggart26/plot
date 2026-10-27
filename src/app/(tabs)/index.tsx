@@ -54,7 +54,25 @@ export default function TodayScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <ScreenIntro eyebrow={dateLabel} title={greeting} subtitle={subtitle} />
+        <ScreenIntro
+          eyebrow={dateLabel}
+          title={greeting}
+          subtitle={subtitle}
+          action={
+            <>
+              <IntroShortcut
+                icon="calendar-outline"
+                label="Planı aç"
+                onPress={() => router.push('/plan')}
+              />
+              <IntroShortcut
+                icon="settings-outline"
+                label="Ayarları aç"
+                onPress={() => router.push('/settings')}
+              />
+            </>
+          }
+        />
 
         <EnergyRow
           value={energyQuery.data ?? null}
@@ -138,6 +156,41 @@ export default function TodayScreen() {
 }
 
 // ─── Parçalar ────────────────────────────────────────────────────────────────
+
+function IntroShortcut({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  onPress: () => void;
+}) {
+  const { c, radius } = useTheme();
+
+  return (
+    <Pressable
+      onPress={() => {
+        haptic('tick');
+        onPress();
+      }}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={[
+        styles.introShortcut,
+        {
+          backgroundColor: c.surface,
+          borderRadius: radius.pill,
+          borderColor: c.border,
+          borderWidth: StyleSheet.hairlineWidth,
+        },
+      ]}
+    >
+      <Ionicons name={icon} size={19} color={c.text} />
+    </Pressable>
+  );
+}
 
 function SectionCard({
   label,
@@ -292,6 +345,12 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   cardAction: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  introShortcut: {
     width: 44,
     height: 44,
     alignItems: 'center',

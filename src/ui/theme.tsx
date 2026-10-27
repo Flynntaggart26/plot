@@ -24,16 +24,20 @@ export type Theme = {
 
 const ThemeContext = createContext<Theme | null>(null);
 
-// Hafta 1'de SecureStore/MMKV ile kalıcılaştırılacak geçici görünüm tercihi
+// Tercih SQLite'taki `appearance_mode` anahtarından yüklenir (bkz. _layout).
 let appearanceOverride: AppearanceMode = 'system';
 
 /**
  * Web hata ayıklama kancası: `?theme=light|dark` ile temayı sabitler.
  * Yalnızca web'de ve URL'de parametre varsa devreye girer; native'i etkilemez.
  */
+let appearanceForcedByUrl = false;
 if (Platform.OS === 'web' && typeof window !== 'undefined') {
   const param = new URLSearchParams(window.location.search).get('theme');
-  if (param === 'light' || param === 'dark') appearanceOverride = param;
+  if (param === 'light' || param === 'dark') {
+    appearanceOverride = param;
+    appearanceForcedByUrl = true;
+  }
 }
 
 const appearanceListeners = new Set<() => void>();
@@ -45,6 +49,11 @@ export function setAppearance(mode: AppearanceMode) {
 
 export function getAppearance(): AppearanceMode {
   return appearanceOverride;
+}
+
+/** URL'deki `?theme=` hata ayıklama kilidi aktif mi? (kalıcı tercih ezilmesin) */
+export function isAppearanceForcedByUrl(): boolean {
+  return appearanceForcedByUrl;
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {

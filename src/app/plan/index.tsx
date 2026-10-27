@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SegmentedControl } from '@/ui/components/SegmentedControl';
-import { Screen, ScreenIntro } from '@/ui/components/Screen';
+import { SubHeader } from '@/ui/components/SubHeader';
+import { useTheme } from '@/ui/theme';
 import { WeekView } from '@/features/plan/WeekView';
 import { MonthView } from '@/features/plan/MonthView';
 
@@ -10,16 +11,17 @@ import { MonthView } from '@/features/plan/MonthView';
  * Drag-drop ile görevleri güne yerleştir.
  */
 export default function PlanScreen() {
+  const { c, space } = useTheme();
   const [view, setView] = useState<'week' | 'month'>('week');
 
   return (
-    <Screen>
-      <ScreenIntro
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <SubHeader
         title="Plan"
         subtitle={view === 'week' ? 'Haftalık görev dağılımı' : 'Aylık takvim'}
       />
 
-      <View style={styles.segmentWrapper}>
+      <View style={[styles.segmentWrapper, { paddingHorizontal: space.lg }]}>
         <SegmentedControl
           value={view}
           onChange={(v) => setView(v as 'week' | 'month')}
@@ -30,14 +32,16 @@ export default function PlanScreen() {
         />
       </View>
 
-      {view === 'week' ? <WeekView /> : <MonthView />}
-    </Screen>
+      <View style={{ flex: 1, paddingHorizontal: space.lg }}>
+        {view === 'week' ? <WeekView /> : <MonthView />}
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   segmentWrapper: {
-    marginTop: -8,
+    marginTop: 4,
     marginBottom: 8,
   },
 });

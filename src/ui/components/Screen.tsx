@@ -58,14 +58,17 @@ export function ScreenIntro({
   eyebrow,
   title,
   subtitle,
+  action,
 }: {
   eyebrow?: string;
   title: string;
   subtitle?: string;
+  /** Sağ üstteki kısayol düğmeleri (ör. takvim, ayarlar). */
+  action?: React.ReactNode;
 }) {
   const { space } = useTheme();
-  return (
-    <View style={{ marginTop: space.sm, gap: space.xxs }}>
+  const text = (
+    <>
       {eyebrow ? (
         <AppText variant="meta" muted style={{ letterSpacing: 1.2 }}>
           {eyebrow}
@@ -77,6 +80,28 @@ export function ScreenIntro({
           {subtitle}
         </AppText>
       ) : null}
+    </>
+  );
+
+  if (!action) {
+    return (
+      <View style={{ marginTop: space.sm, gap: space.xxs }}>{text}</View>
+    );
+  }
+
+  return (
+    <View
+      style={{
+        marginTop: space.sm,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: space.sm,
+      }}
+    >
+      <View style={{ flex: 1, gap: space.xxs }}>{text}</View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xxs }}>
+        {action}
+      </View>
     </View>
   );
 }
