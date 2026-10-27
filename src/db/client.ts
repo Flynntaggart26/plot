@@ -28,10 +28,12 @@ export function initDatabase(): Promise<AppDatabase> {
   pending = (async () => {
     const opened = await openDatabaseAsync(DATABASE_NAME);
     // WAL yalnızca native: web VFS'te her ortamda desteklenmiyor.
+    // PRAGMA'lar async çalışır: açılış zaten async, senkron çağrı web'de
+    // ana thread'i bloklar ve "synchronous SQLite operations" uyarısını tetikler.
     if (Platform.OS !== 'web') {
-      opened.execSync('PRAGMA journal_mode = WAL;');
+      await opened.execAsync('PRAGMA journal_mode = WAL;');
     }
-    opened.execSync('PRAGMA foreign_keys = ON;');
+    await opened.execAsync('PRAGMA foreign_keys = ON;');
 
     connection = opened;
     database = drizzle(opened, { schema });
