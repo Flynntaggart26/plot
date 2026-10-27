@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -9,61 +9,29 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 import { Screen, ScreenIntro } from '@/ui/components/Screen';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { Button } from '@/ui/components/Button';
 import { useTheme } from '@/ui/theme';
 import { haptic } from '@/lib/haptics';
-import { useNotes, useCreateNote, useUpdateNote } from '@/features/notes/queries';
-import { NoteEditor } from '@/features/notes/NoteEditor';
-import type { Note } from '@/db/schema';
+import { useNotes } from '@/features/notes/queries';
 import { space as sp } from '@/ui/tokens';
 
+/**
+ * Notlar listesi. Düzenleme ve silme tek bir yerde — `/note/[id]` —
+ * yapılır; böylece liste ekranı yalnızca gezinir, iki ayrı editör
+ * davranışı doğmaz.
+ */
 export default function NotesScreen() {
   const { c, radius: rad } = useTheme();
-  const [editingNote, setEditingNote] = useState<Note | null>(null);
-  const [newNoteOpen, setNewNoteOpen] = useState(false);
-
   const { data: notes, isLoading } = useNotes();
-  const createNote = useCreateNote();
-  const updateNote = useUpdateNote(editingNote?.id ?? '');
-
-  const handleSave = useCallback(
-    (values: { title: string; bodyMd: string }) => {
-      createNote.mutate(values, {
-        onSuccess: () => {
-          setNewNoteOpen(false);
-          haptic('success');
-        },
-      });
-    },
-    [createNote],
-  );
-
-  const handleUpdate = useCallback(
-    (values: { title: string; bodyMd: string }) => {
-      if (!editingNote) return;
-      updateNote.mutate(values, {
-        onSuccess: () => {
-          setEditingNote(null);
-          haptic('success');
-        },
-      });
-    },
-    [editingNote, updateNote],
-  );
-
-  const openEditor = (note: Note | null) => {
-    haptic('light');
-    setEditingNote(note ?? null);
-  };
 
   const sortedNotes = useMemo(() => {
     if (!notes) return [];
     return [...notes].sort(
-      (a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
     );
   }, [notes]);
 
@@ -134,7 +102,10 @@ export default function NotesScreen() {
           {sortedNotes.map((note) => (
             <TouchableOpacity
               key={note.id}
-              onPress={() => openEditor(note)}
+              onPress={() => {
+                haptic('light');
+                router.push({ pathname: '/note/[id]', params: { id: note.id } });
+              }}
               accessible
               accessibilityRole="link"
               accessibilityLabel={note.title}
@@ -143,9 +114,7 @@ export default function NotesScreen() {
               <View style={noteRowContentStyle}>
                 <Ionicons name="document-text-outline" size={20} color={c.textMuted} />
                 <View style={noteRowTextStyle}>
-                  <Text style={[noteTitleStyle, { color: c.text }]}>
-                    {note.title}
-                  </Text>
+                  <Text style={[noteTitleStyle, { color: c.text }]}>{note.title}</Text>
                   <Text style={[noteMetaStyle, { color: c.textMuted }]}>
                     {new Date(note.updatedAt).toLocaleDateString('tr-TR')}
                   </Text>
@@ -162,28 +131,9 @@ export default function NotesScreen() {
         icon="create-outline"
         onPress={() => {
           haptic('medium');
-          setNewNoteOpen(true);
+          router.push('/note/new');
         }}
       />
-
-      {newNoteOpen && (
-        <NoteEditor
-          initialTitle=""
-          initialBody=""
-          onSave={handleSave}
-          busy={createNote.isPending}
-        />
-      )}
-
-      {editingNote && (
-        <NoteEditor
-          noteId={editingNote.id}
-          initialTitle={editingNote.title}
-          initialBody={editingNote.bodyMd}
-          onSave={handleUpdate}
-          busy={updateNote.isPending}
-        />
-      )}
     </Screen>
   );
 }
