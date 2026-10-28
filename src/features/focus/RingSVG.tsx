@@ -35,9 +35,7 @@ export function RingSVG({
   const { SVG_SIZE, CENTER, R_INNER, R_OUTER, W_INNER, W_OUTER, DASH_INNER } = FOCUS_RING_CONSTANTS;
   
   const isWork = mode === 'work';
-  const segmentColor = isWork ? outerColor : breakOuterColor;
   const innerStroke = isWork ? innerColor : breakInnerColor;
-  const accentSoft = isWork ? `${innerColor}22` : `${breakInnerColor}22`;
 
   // Segment path'leri önceden hesapla
   const segmentPaths = React.useMemo(() => 
@@ -57,7 +55,6 @@ export function RingSVG({
           
           let progress = 0;
           let strokeColor = c.border;
-          let isActive = false;
           
           if (isCompleted) {
             progress = 1;
@@ -65,11 +62,9 @@ export function RingSVG({
           } else if (isCurrent) {
             progress = outerSegmentsProgress[i];
             strokeColor = outerColor;
-            isActive = true;
           } else if (isCurrentBreak) {
             progress = outerSegmentsProgress[i];
             strokeColor = breakOuterColor;
-            isActive = true;
           } else if (mode === 'break' && i < completedWorkSessions) {
             // Mola sırasında tamamlanmış çalışmalar dolu kalsın
             progress = 1;

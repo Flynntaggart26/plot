@@ -1,10 +1,8 @@
 import React from 'react';
-import { Pressable, View, StyleSheet, Text } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, Easing } from 'react-native-reanimated';
+import { Pressable, StyleSheet, Text } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/ui/theme';
-import { haptic } from '@/lib/haptics';
-import { useFocusStore } from './store';
 
 interface StartButtonProps {
   onPress: () => void;
@@ -22,7 +20,7 @@ export function StartButton({ onPress, isRunning, isCompleted, mode, workColor }
   
   React.useEffect(() => {
     bgColor.value = mode === 'work' ? workColor : '#FF6B2E';
-  }, [mode, workColor]);
+  }, [mode, workColor, bgColor]);
 
   const handlePressIn = () => {
     scale.value = withSpring(0.96, { damping: 15, stiffness: 150 });

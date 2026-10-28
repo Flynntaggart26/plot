@@ -30,7 +30,7 @@ function SessionDot({ isCompleted, isCurrent, pulse, outerColor, activeColor, bo
     transform: [{ scale: pulse.value }],
     backgroundColor: bgColor,
     borderColor: bColor,
-  }), [isCompleted, borderColor, outerColor]);
+  }), [isCompleted, borderColor, outerColor, bgColor, bColor]);
 
   return (
     <Animated.View style={[styles.dot, animatedStyle]} />
@@ -57,7 +57,7 @@ export function SessionDots({
         pulse.value = withTiming(1, { duration: 750, easing: Easing.inOut(Easing.ease) });
       });
     }
-  }, [isRunning, isWork]);
+  }, [isRunning, isWork, pulse]);
 
   const dots = React.useMemo(() => 
     Array.from({ length: totalSessions }, (_, i) => {

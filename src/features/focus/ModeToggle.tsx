@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, View, StyleSheet, Text } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { useTheme } from '@/ui/theme';
 
 interface ModeToggleProps {
@@ -11,13 +11,13 @@ interface ModeToggleProps {
 }
 
 export function ModeToggle({ mode, onChange, workColor, breakColor }: ModeToggleProps) {
-  const { c } = useTheme();
+  useTheme(); // for theme context
   
   const activeMode = useSharedValue(mode === 'work' ? 0 : 1);
   
   React.useEffect(() => {
     activeMode.value = mode === 'work' ? 0 : 1;
-  }, [mode]);
+  }, [mode, activeMode]);
 
   const indicatorStyle = useAnimatedStyle(() => {
     const translateX = activeMode.value === 0 ? 4 : 4 + 100; // 4 padding + ~100 button width

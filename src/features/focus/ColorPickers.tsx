@@ -1,11 +1,11 @@
 import React from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { ColorButton } from '@/ui/components/ColorButton';
 import { useFocusStore } from './store';
 import { useTheme } from '@/ui/theme';
 
 export function ColorPickers() {
-  const { c } = useTheme();
+  useTheme(); // for theme context
   const mode = useFocusStore(s => s.mode);
   const innerColor = useFocusStore(s => s.innerColor);
   const outerColor = useFocusStore(s => s.outerColor);

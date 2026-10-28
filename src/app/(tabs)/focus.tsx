@@ -1,6 +1,5 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { View, StyleSheet, Text, SafeAreaView } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/ui/theme';
 import { haptic } from '@/lib/haptics';
@@ -40,7 +39,7 @@ export default function FocusScreen() {
 
   // Derived state
   const isWork = mode === 'work';
-  const outerSegmentsProgress = React.useMemo(() => {
+  const outerSegmentsProgress = useMemo(() => {
     const base = Array(totalSessions).fill(0);
     if (isWork) {
       // Çalışma modunda: tamamlanmışlar 1, güncel progress, diğerleri 0
@@ -56,14 +55,14 @@ export default function FocusScreen() {
       }
     }
     return base;
-  }, [mode, innerProgress, completedWorkSessions, totalSessions, isRunning]);
+  }, [isWork, innerProgress, completedWorkSessions, totalSessions, isRunning]);
 
   // Haptic on completion
   useEffect(() => {
     if (timeLeft === 0 && !isRunning && duration > 0) {
       haptic('success');
     }
-  }, [timeLeft, isRunning]);
+  }, [timeLeft, isRunning, duration]);
 
   // Handle timer completion
   const handleTimerPress = useCallback(() => {

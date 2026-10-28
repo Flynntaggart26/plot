@@ -1,6 +1,5 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '@/ui/theme';
 
 interface ColorButtonProps {
   value: string;
@@ -11,8 +10,6 @@ interface ColorButtonProps {
 }
 
 export function ColorButton({ value, onChange, label, disabled, accessibilityLabel }: ColorButtonProps) {
-  const { c } = useTheme();
-
   return (
     <View style={styles.wrap}>
       <Text style={styles.label}>{label}</Text>

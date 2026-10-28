@@ -9,7 +9,6 @@ import { getSetting, setSetting } from '@/features/settings/preferences';
 import {
   FocusState,
   FocusMode,
-  FocusSettings,
   FOCUS_DEFAULTS,
   FOCUS_SETTINGS_KEYS,
 } from './types';
@@ -74,21 +73,21 @@ export const useFocusStore = create<FocusState & FocusActions>()(
 
       // Timer actions
       startTimer: () => {
-        const { isRunning, timeLeft, duration, timerId } = get();
+        const { isRunning, timeLeft, duration } = get();
         if (isRunning) return;
         if (timeLeft <= 0) {
           set({ timeLeft: duration, currentSessionProgress: 0 });
         }
         
-        const id = setInterval(() => get().tick(), 1000);
-        set({ isRunning: true, timerId: id });
+        setInterval(() => get().tick(), 1000);
+        set({ isRunning: true });
       },
 
       pauseTimer: () => {
         const { timerId } = get();
         if (timerId) {
           clearInterval(timerId);
-          set({ isRunning: false, timerId: null });
+          set({ isRunning: false });
         }
       },
 
@@ -102,7 +101,7 @@ export const useFocusStore = create<FocusState & FocusActions>()(
       },
 
       tick: () => {
-        const { timeLeft, duration, mode, totalSessions, completedWorkSessions, isRunning } = get();
+        const { timeLeft, duration, mode, isRunning } = get();
         if (!isRunning || timeLeft <= 0) return;
 
         const newTimeLeft = timeLeft - 1;
@@ -147,7 +146,7 @@ export const useFocusStore = create<FocusState & FocusActions>()(
       },
 
       completeWorkSession: () => {
-        const { completedWorkSessions, totalSessions, duration } = get();
+        const { completedWorkSessions, totalSessions } = get();
         const newCompleted = completedWorkSessions + 1;
         
         if (newCompleted >= totalSessions) {

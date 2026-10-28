@@ -11,7 +11,7 @@ interface SelectWrapProps {
 }
 
 export function SelectWrap({ value, onChange, options, disabled, accessibilityLabel }: SelectWrapProps) {
-  const { c } = useTheme();
+  useTheme(); // for theme context
 
   return (
     <View style={styles.wrap} accessibilityLabel={accessibilityLabel} accessible={true}>
