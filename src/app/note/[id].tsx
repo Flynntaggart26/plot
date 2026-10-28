@@ -180,9 +180,6 @@ export default function NoteDetail() {
         >
           <View style={{ gap: sp.xxs }}>
             <AppText variant="display">{note.title}</AppText>
-            <AppText variant="meta" faint>
-              {subtitle}
-            </AppText>
           </View>
 
           <NoteBody body={note.bodyMd} titleIndex={titleIndex} onOpenNote={openNote} />

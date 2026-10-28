@@ -44,6 +44,8 @@ import type { Task } from '@/db/schema';
 const DAY_WIDTH = 120;
 const DAY_GAP = sp.sm;
 const LONG_PRESS_MS = 250;
+/** Tamamlananlar bölümünde gösterilen başlık sayısı; gerisi "+N daha" olur. */
+const COMPLETED_PREVIEW = 2;
 const SOURCE = '__source__';
 const WEEKDAYS = ['PZT', 'SAL', 'ÇAR', 'PER', 'CUM', 'CMT', 'PAZ'];
 
@@ -660,7 +662,7 @@ function DayColumn({
           <AppText variant="meta" style={[styles.doneLabel, { color: c.focus }]}>
             ✓ {day.completed.length} tamamlandı
           </AppText>
-          {day.completed.slice(0, 3).map((task) => (
+          {day.completed.slice(0, COMPLETED_PREVIEW).map((task) => (
             <AppText
               key={task.id}
               variant="meta"
@@ -671,9 +673,9 @@ function DayColumn({
               {task.title}
             </AppText>
           ))}
-          {day.completed.length > 3 ? (
+          {day.completed.length > COMPLETED_PREVIEW ? (
             <AppText variant="meta" faint style={styles.doneTask}>
-              +{day.completed.length - 3}
+              +{day.completed.length - COMPLETED_PREVIEW} daha
             </AppText>
           ) : null}
         </View>
@@ -1278,13 +1280,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   doneLabel: {
-    fontSize: 10,
-    letterSpacing: 0.3,
+    fontSize: 11.5,
+    letterSpacing: 0.2,
     marginBottom: 2,
   },
   doneTask: {
-    fontSize: 10,
-    lineHeight: 14,
+    fontSize: 11.5,
+    lineHeight: 16,
     textDecorationLine: 'line-through',
   },
   sourcePanel: {
