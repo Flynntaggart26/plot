@@ -1,128 +1,268 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Svg, Circle } from 'react-native-svg';
+import React, { useCallback, useEffect } from 'react';
+import { View, StyleSheet, Text, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/ui/theme';
 import { haptic } from '@/lib/haptics';
-import { createFocusSession, endFocusSession, getFocusStats } from '@/features/focus/service';
-const TOTAL_SEC = 25 * 60;
-const RING_SIZE = 280;
-const RING_T = 16;
-const RING_R = (RING_SIZE - RING_T - 24) / 2;
-const FULL_DASH = 2 * Math.PI * RING_R;
-const RING_C = RING_SIZE / 2;
-function formatTime(s: number): string {
-  const m = Math.floor(s / 60);
-  const r = Math.floor(s % 60);
-  return `${m.toString().padStart(2, '0')}:${r.toString().padStart(2, '0')}`;
-}
+import { useFocusStore } from '@/features/focus/store';
+import { RingSVG } from '@/features/focus/RingSVG';
+import { SessionDots } from '@/features/focus/SessionDots';
+import { ModeToggle } from '@/features/focus/ModeToggle';
+import { SettingsGrid } from '@/features/focus/SettingsGrid';
+import { ColorPickers } from '@/features/focus/ColorPickers';
+import { StartButton } from '@/features/focus/StartButton';
+import { formatTime } from '@/features/focus/utils';
+import { FOCUS_RING_CONSTANTS } from '@/features/focus/SegmentPath';
 
-/** İstatistik okuması ikincil: başarısız olursa ekran çalışmaya devam eder. */
-function readFocusStats() {
-  try {
-    return getFocusStats();
-  } catch {
-    return null;
-  }
-}
 export default function FocusScreen() {
+  const insets = useSafeAreaInsets();
   const { c, space } = useTheme();
-  const [isActive, setIsActive] = useState(false);
-  const [isCompleted, setIsCompleted] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(TOTAL_SEC);
-  const sessionIdRef = useRef<string | null>(null);
-  const progress = timeLeft / TOTAL_SEC;
-  const dashOffset = FULL_DASH * (1 - progress);
-  // Okuma başarısız olursa ekranı düşürmeyelim: istatistik ikincil bilgi.
-  /* eslint-disable react-hooks/exhaustive-deps -- isCompleted kasıtlı yenileme tetikleyicisi */
-  const stats = useMemo(() => readFocusStats(), [isCompleted]);
-  /* eslint-enable react-hooks/exhaustive-deps */
-  useEffect(() => {
-    if (!isActive) return;
-    const id = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(id);
-          setIsActive(false);
-          setIsCompleted(true);
-          haptic('success');
-          if (sessionIdRef.current) {
-            try {
-              endFocusSession(sessionIdRef.current, { actualMin: 25, endedAt: new Date().toISOString() });
-            } catch { /* yoksay */ }
-            sessionIdRef.current = null;
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, [isActive]);
-  const startTimer = useCallback(() => {
-    if (isActive) return;
-    haptic('medium');
-    setIsCompleted(false);
-    if (timeLeft <= 0) setTimeLeft(TOTAL_SEC);
-    try {
-      const s = createFocusSession({ plannedMin: 25, mood: null });
-      sessionIdRef.current = s.id;
-    } catch { sessionIdRef.current = null; }
-    setIsActive(true);
-  }, [isActive, timeLeft]);
-  const pauseTimer = useCallback(() => { haptic('light'); setIsActive(false); }, []);
-  const resetTimer = useCallback(() => {
-    haptic('light');
-    setIsActive(false);
-    setIsCompleted(false);
-    setTimeLeft(TOTAL_SEC);
-    if (sessionIdRef.current) {
-      try {
-        endFocusSession(sessionIdRef.current, { actualMin: Math.max(0, 25 - Math.ceil(timeLeft / 60)), endedAt: new Date().toISOString() });
-      } catch { /* yoksay */ }
-      sessionIdRef.current = null;
+  
+  // Store selectors
+  const mode = useFocusStore(s => s.mode);
+  const timeLeft = useFocusStore(s => s.timeLeft);
+  const duration = useFocusStore(s => s.duration);
+  const totalSessions = useFocusStore(s => s.totalSessions);
+  const completedWorkSessions = useFocusStore(s => s.completedWorkSessions);
+  const innerProgress = useFocusStore(s => s.currentSessionProgress);
+  const isRunning = useFocusStore(s => s.isRunning);
+  const isCompleted = useFocusStore(s => s.timeLeft <= 0 && !s.isRunning);
+  const innerColor = useFocusStore(s => s.innerColor);
+  const outerColor = useFocusStore(s => s.outerColor);
+  const breakInnerColor = useFocusStore(s => s.breakInnerColor);
+  const breakOuterColor = useFocusStore(s => s.breakOuterColor);
+  
+  // Actions
+  const startTimer = useFocusStore(s => s.startTimer);
+  const pauseTimer = useFocusStore(s => s.pauseTimer);
+  const resetTimer = useFocusStore(s => s.resetTimer);
+  const setMode = useFocusStore(s => s.setMode);
+
+  // Derived state
+  const isWork = mode === 'work';
+  const outerSegmentsProgress = React.useMemo(() => {
+    const base = Array(totalSessions).fill(0);
+    if (isWork) {
+      // Çalışma modunda: tamamlanmışlar 1, güncel progress, diğerleri 0
+      for (let i = 0; i < completedWorkSessions; i++) base[i] = 1;
+      if (isRunning && completedWorkSessions < totalSessions) {
+        base[completedWorkSessions] = innerProgress;
+      }
+    } else {
+      // Mola modunda: tamamlanmış çalışmalar 1, mola progress (güncel segment)
+      for (let i = 0; i < completedWorkSessions; i++) base[i] = 1;
+      if (isRunning && completedWorkSessions < totalSessions) {
+        base[completedWorkSessions] = innerProgress;
+      }
     }
-  }, [timeLeft]);
+    return base;
+  }, [mode, innerProgress, completedWorkSessions, totalSessions, isRunning]);
+
+  // Haptic on completion
+  useEffect(() => {
+    if (timeLeft === 0 && !isRunning && duration > 0) {
+      haptic('success');
+    }
+  }, [timeLeft, isRunning]);
+
+  // Handle timer completion
+  const handleTimerPress = useCallback(() => {
+    if (isCompleted) {
+      if (mode === 'work') {
+        // Çalışma bitti, mola başlasın (store içinde otomatik)
+        // Sadece UI reset
+        resetTimer();
+      } else {
+        // Mola bitti, çalışmaya devam
+        resetTimer();
+      }
+    } else {
+      haptic(isRunning ? 'light' : 'medium');
+      if (isRunning) {
+        pauseTimer();
+      } else {
+        startTimer();
+      }
+    }
+  }, [isCompleted, isRunning, mode, startTimer, pauseTimer, resetTimer]);
+
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg, paddingHorizontal: space.lg }}>
-      <View style={{ paddingTop: space.md }}>
-        <Text style={{ fontSize: 28, fontWeight: '700', color: c.text }}>{isActive ? 'Odakta' : 'Odak'}</Text>
-        <Text style={{ fontSize: 14, color: c.textMuted, marginTop: 4 }}>
-          {isCompleted ? 'Odak süresi tamamlandı!' : isActive ? 'Geri sayım devam ediyor' : '25 dakikalık odak bloğu'}
-        </Text>
-      </View>
-      <View style={{ alignItems: 'center', marginTop: space.lg }}>
-        <Svg width={RING_SIZE} height={RING_SIZE}>
-          <Circle cx={RING_C} cy={RING_C} r={RING_R} fill="none" stroke={c.border} strokeWidth={RING_T} strokeLinecap="round" />
-          <Circle cx={RING_C} cy={RING_C} r={RING_R} fill="none" stroke={isActive ? c.focus : c.accent} strokeWidth={RING_T} strokeLinecap="round" strokeDasharray={FULL_DASH} strokeDashoffset={dashOffset} transform={`rotate(-90 ${RING_C} ${RING_C})`} />
-        </Svg>
-        <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
-          <Text style={{ fontSize: 44, fontWeight: '700', color: isActive ? c.focus : c.text }}>{formatTime(timeLeft)}</Text>
-          <Text style={{ fontSize: 13, color: c.textMuted }}>dakika</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }}>
+      <View style={[styles.container, { paddingTop: insets.top + space.md }]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: c.text }]}>
+            {isWork ? 'Odak' : 'Mola'}
+          </Text>
+        </View>
+
+        {/* Ring Card */}
+        <View style={styles.ringCard}>
+          <View style={styles.ringWrap}>
+            <RingSVG
+              mode={mode}
+              innerProgress={innerProgress}
+              outerSegmentsProgress={outerSegmentsProgress}
+              totalSessions={totalSessions}
+              completedWorkSessions={completedWorkSessions}
+              isRunning={isRunning}
+              innerColor={innerColor}
+              outerColor={outerColor}
+              breakInnerColor={breakInnerColor}
+              breakOuterColor={breakOuterColor}
+            />
+            <View style={styles.center}>
+              <Text style={[styles.time, { color: isWork ? innerColor : breakInnerColor }]}>
+                {formatTime(timeLeft)}
+              </Text>
+              <View style={styles.modeBadge}>
+                <Text style={[styles.modeIcon, { color: isWork ? innerColor : breakInnerColor }]}>
+                  {isWork ? '🔥' : '☕'}
+                </Text>
+                <Text style={[styles.modeText, { color: isWork ? innerColor : breakInnerColor }]}>
+                  {isWork ? 'Çalışma' : 'Mola'}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Session Dots */}
+          <SessionDots
+            totalSessions={totalSessions}
+            completedWorkSessions={completedWorkSessions}
+            isRunning={isRunning}
+            mode={mode}
+            outerColor={outerColor}
+            breakOuterColor={breakOuterColor}
+          />
+          <Text style={[styles.sessionLabel, { color: c.textMuted }]}>
+            {totalSessions} oturum
+          </Text>
+
+          {/* Controls */}
+          <View style={styles.controls}>
+            {/* Mode Toggle */}
+            <ModeToggle
+              mode={mode}
+              onChange={setMode}
+              workColor={innerColor}
+              breakColor={breakInnerColor}
+            />
+
+            <View style={styles.divider}>
+              <Text style={styles.dividerText}>Ayarlar</Text>
+            </View>
+
+            <SettingsGrid />
+
+            <View style={styles.divider}>
+              <Text style={styles.dividerText}>Renkler</Text>
+            </View>
+
+            <ColorPickers />
+
+            {/* Start Button */}
+            <StartButton
+              onPress={handleTimerPress}
+              isRunning={isRunning}
+              isCompleted={isCompleted}
+              mode={mode}
+              workColor={innerColor}
+            />
+          </View>
         </View>
       </View>
-      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: space.md, marginTop: space.lg }}>
-        <Pressable style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center' }} onPress={isActive ? pauseTimer : startTimer} disabled={isCompleted} accessibilityLabel={isActive ? 'Durdur' : 'Başlat'}>
-          <Ionicons name={isActive ? 'pause-outline' : 'play-outline'} size={26} color={c.bg} />
-        </Pressable>
-        <Pressable style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: c.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }} onPress={resetTimer} accessibilityLabel="Sıfırla">
-          <Ionicons name="refresh-outline" size={22} color={c.textMuted} />
-        </Pressable>
-      </View>
-      {isCompleted && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.lg, padding: space.md, backgroundColor: c.surface, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: c.focus }}>
-          <Ionicons name="checkmark-circle" size={20} color={c.focus} />
-          <Text style={{ fontSize: 14, color: c.focus, flex: 1 }}>Odak hedefine ulaştın. Mola vermeye hazır mısın?</Text>
-        </View>
-      )}
-      <View style={{ marginTop: space.lg, paddingHorizontal: space.md }}>
-        <Text style={{ fontSize: 12, fontWeight: '600', color: c.textMuted }}>Odak İstatistikleri</Text>
-        {stats ? (
-          <Text style={{ fontSize: 14, color: c.text, marginTop: 4 }}>Toplam oturum: {stats.totalSessions} · Tamamlanan: {stats.completedSessions}</Text>
-        ) : (
-          <Text style={{ fontSize: 13, color: c.textMuted, marginTop: 4 }}>İstatistikler okunamadı.</Text>
-        )}
-      </View>
-    </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+  },
+  ringCard: {
+    marginHorizontal: 16,
+    backgroundColor: '#16161A',
+    borderWidth: 1,
+    borderColor: '#2A2A30',
+    borderRadius: 24,
+    padding: 24,
+    paddingBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  ringWrap: {
+    position: 'relative',
+    width: FOCUS_RING_CONSTANTS.SVG_SIZE,
+    height: FOCUS_RING_CONSTANTS.SVG_SIZE,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  center: {
+    position: 'absolute',
+    inset: 0,
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  time: {
+    fontSize: 64,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+    fontFamily: 'SF Mono, Monaco, monospace',
+    lineHeight: 64,
+  },
+  modeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 100,
+  },
+  modeIcon: {
+    fontSize: 14,
+  },
+  modeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  sessionLabel: {
+    marginTop: 8,
+    textAlign: 'center',
+    fontSize: 13,
+  },
+  controls: {
+    flexDirection: 'column',
+    gap: 16,
+    marginTop: 8,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginVertical: 4,
+  },
+  dividerText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    color: '#8A847C',
+  },
+});

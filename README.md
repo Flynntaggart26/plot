@@ -80,6 +80,16 @@ Plot is a local-first productivity mobile application designed for ADHD-friendly
 - **Turkish-aware search**: Case- and accent-insensitive search over titles and bodies (`ı`/`i`, `İ`/`i`), with a matching-line excerpt.
 - **Insert links while writing**: "Bağlantı ekle" opens a searchable note picker and inserts `[[Başlık]]` at the caret.
 
+### Focus (`/focus`) — 0.4.0
+- **Concentric ring timer**: Inner ring = session progress (decreases), outer ring = session segments (fills as sessions complete).
+- **Pomodoro cycles**: Work (default 25 min) → Short break (5 min) → Work → ... → 4th work → Long break (15 min). Automatic transitions.
+- **Configurable**: Duration 1–120 min, sessions 2/3/4/5/6/8. Outer ring divides into equal segments with gaps.
+- **Custom colors**: Inner/outer ring color pickers (Work mode only). Break uses fixed warm orange.
+- **Session dots**: Visual indicator below ring — filled (completed), pulsing (current), empty (pending).
+- **Mode toggle**: Pill-style Work/Break switch with animated indicator.
+- **Persisted settings**: Duration, sessions, colors, completed sessions survive app restarts.
+- **60 fps Reanimated**: Smooth ring progress, segment fills, pulse animation. Respects `prefers-reduced-motion`.
+
 ### Database (SQLite + Drizzle)
 15 tables: `areas`, `projects`, `tasks`, `task_events`, `focus_sessions`, `notes`, `note_links`, `tags`, `note_tags`, `ideas`, `daily_plans`, `chat_threads`, `chat_messages`, `ai_runs`, `settings`.
 - Idempotent seed (Inbox area + project, default settings).
@@ -91,8 +101,7 @@ Plot is a local-first productivity mobile application designed for ADHD-friendly
 - **Confirmation toasts**: Save, update and delete actions confirm in a short pill above the tab bar instead of leaving the screen silent.
 - **Motion with an off switch**: Warm metal sheen, a sliding tab lamp and animated check circles carry state changes; every decorative animation disappears when the OS "reduce motion" preference is on.
 
-### Deferred (0.4.0+)
-- Focus screen: live timer + Skia ring progress.
+### Deferred (0.5.0+)
 - Notes: graph view and full-text index for large libraries.
 - Plan: week-level capacity warnings.
 - Share-to-Plot intent (needs native module + dev build).
@@ -210,11 +219,22 @@ plot/
 │   │   │   ├── queries.ts         # TanStack Query hooks
 │   │   │   ├── TaskForm.tsx       # Create/edit form
 │   │   │   └── TaskRow.tsx        # Task list row
-│   │   └── today/                 # Today feature (energy, timeline)
-│   │       ├── service.ts
-│   │       ├── queries.ts
-│   │       ├── EnergyRow.tsx
-│   │       └── Timeline.tsx
+│   │   ├── today/                 # Today feature (energy, timeline)
+│   │   │   ├── service.ts
+│   │   │   ├── queries.ts
+│   │   │   ├── EnergyRow.tsx
+│   │   │   └── Timeline.tsx
+│   │   └── focus/                 # Focus (Pomodoro) feature — 0.4.0
+│   │       ├── store.ts           # Zustand + SQLite persist
+│   │       ├── RingSVG.tsx        # Concentric ring (inner + outer segments)
+│   │       ├── SegmentPath.ts     # Segment geometry
+│   │       ├── SessionDots.tsx    # Progress dots
+│   │       ├── ModeToggle.tsx     # Work/Break pill toggle
+│   │       ├── SettingsGrid.tsx   # Duration + sessions selectors
+│   │       ├── ColorPickers.tsx   # Inner/outer ring color pickers
+│   │       ├── StartButton.tsx    # Hero start/pause button
+│   │       ├── types.ts           # TypeScript types
+│   │       └── utils.ts           # formatTime helper
 │   ├── lib/                       # Shared utilities
 │   │   ├── date.ts                # Local day keys, bounds, labels
 │   │   ├── haptics.ts             # Haptic feedback abstraction
@@ -225,6 +245,8 @@ plot/
 │       ├── theme.tsx              # ThemeProvider (dark/light/system)
 │       ├── tokens.ts              # Colors, type, space, radius, duration, haptics
 │       ├── components/            # Reusable UI components
+│       │   ├── ColorButton.tsx    # 44px color picker button
+│       │   └── SelectWrap.tsx     # Custom select wrapper
 │       └── motion/                # Reanimated hooks & presets
 ```
 
@@ -255,7 +277,7 @@ All user-facing strings are in Turkish (`Günaydın`, `Bugünün Görevleri`, `M
 |-------|-------|
 | Week 1 | ✅ Tasks + Today (shipped) |
 | Week 2 | Plan drag-and-drop + month view (shipped in 0.3.0) |
-| Week 3 | Focus timer (Skia ring) |
+| Week 3 | ✅ Focus timer + concentric ring (shipped in 0.4.0) |
 | Week 4 | Linked notes + backlinks + search (shipped in 0.3.0) |
 | Week 5 | Data export/import (`.md` backup) |
 | Week 6 | AI assistant (Muse) |
