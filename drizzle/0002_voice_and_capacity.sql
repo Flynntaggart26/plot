@@ -4,4 +4,3 @@ ALTER TABLE `tasks` ADD COLUMN `duration` integer;
 ALTER TABLE `tasks` ADD COLUMN `audio_path` text;
 --> statement-breakpoint
 ALTER TABLE `ideas` ADD COLUMN `audio_path` text;
---> statement-breakpoint
