@@ -19,6 +19,7 @@ import { useCreateNote, useDeleteNote, useNote, useNotes, useUpdateNote } from '
 import { NoteEditor } from '@/features/notes/NoteEditor';
 import { NoteBody } from '@/features/notes/NoteBody';
 import { NoteLinksSection } from '@/features/notes/NoteLinks';
+import { NoteMiniMap } from '@/features/notes/NoteMiniMap';
 import { normalizeTitle } from '@/features/notes/link-utils';
 import { space } from '@/ui/tokens';
 
@@ -189,6 +190,8 @@ export default function NoteDetail() {
             onOpenNote={openNote}
             onCreateNote={createFromLink}
           />
+
+          <NoteMiniMap noteId={note.id} />
 
           {error ? (
             <View

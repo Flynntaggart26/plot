@@ -18,6 +18,7 @@ export type TaskFormValues = {
   estimateMin: number | null;
   energy: TaskEnergy | null;
   mustDo: boolean;
+  audioPath: string | null;
 };
 
 const ESTIMATES: { value: number | null; label: string }[] = [
@@ -63,6 +64,7 @@ export function TaskForm({
   const [mustDo, setMustDo] = useState(
     initial ? initial.priority === 1 : defaultMustDo && openMustDoCount < MUST_DO_LIMIT,
   );
+  const [audioPath, setAudioPath] = useState<string | null>(initial?.audioPath ?? null);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const startingMustDo = initial ? initial.priority === 1 : false;
@@ -81,7 +83,7 @@ export function TaskForm({
       return;
     }
     setLocalError(null);
-    onSubmit({ title, notes, estimateMin, energy, mustDo: shownMustDo });
+    onSubmit({ title, notes, estimateMin, energy, mustDo: shownMustDo, audioPath });
   };
 
   return (
@@ -181,6 +183,46 @@ export function TaskForm({
             <AppText variant="meta" style={{ color: c.danger }}>
               {shownError}
             </AppText>
+          </View>
+        ) : null}
+
+        {audioPath ? (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: space.xs,
+              paddingHorizontal: space.md,
+              marginTop: space.xs,
+              backgroundColor: c.surfaceRaised,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: c.border,
+              borderRadius: radius.pill,
+            }}
+          >
+            <Ionicons name="musical-notes" size={16} color={c.accent} />
+            <AppText variant="meta" muted>
+              Ses kaydı eklendi
+            </AppText>
+            <Pressable
+              onPress={() => {
+                haptic('light');
+              }}
+              accessibilityLabel="Ses kaydını dinle"
+              style={{ padding: 4 }}
+            >
+              <Ionicons name="play-outline" size={16} color={c.accent} />
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setAudioPath(null);
+                haptic('light');
+              }}
+              accessibilityLabel="Kaydı kaldır"
+              style={{ padding: 4 }}
+            >
+              <Ionicons name="trash-outline" size={16} color={c.danger} />
+            </Pressable>
           </View>
         ) : null}
 

@@ -24,6 +24,45 @@ let timerHandle: ReturnType<typeof setInterval> | null = null;
 /** Calisan blogun baslangic ani (ISO). Duraklatma bunu sifirlamaz. */
 let sessionStartedAt: string | null = null;
 
+/** Mola hatirlaticisi idle tutamaci (2 dakika = 120_000 ms). */
+let breakReminderTimer: ReturnType<typeof setTimeout> | null = null;
+/** Son etkinlik zamani (mouse/touch). */
+let lastActivityAt: number = Date.now();
+
+const BREAK_REMINDER_IDLE_MS = 2 * 60 * 1000; // 2 dakika
+
+function resetBreakReminderTimer(): void {
+  if (breakReminderTimer !== null) {
+    clearTimeout(breakReminderTimer);
+    breakReminderTimer = null;
+  }
+}
+
+function startBreakReminderMonitor(get: () => { isRunning: boolean; breakReminderEnabled: boolean }): void {
+  resetBreakReminderTimer();
+  if (!get().breakReminderEnabled || !get().isRunning) return;
+
+  breakReminderTimer = setTimeout(() => {
+    const state = get();
+    if (state.breakReminderEnabled && state.isRunning) {
+      const idle = Date.now() - lastActivityAt;
+      if (idle >= BREAK_REMINDER_IDLE_MS) {
+        // UI tarafindan okulur: store'da isaretle
+        const store = get as any;
+        if (store.setBreakReminderTriggered) store.setBreakReminderTriggered(true);
+      }
+    }
+  }, BREAK_REMINDER_IDLE_MS - (Date.now() - lastActivityAt));
+}
+
+function stopBreakReminderMonitor(): void {
+  resetBreakReminderTimer();
+}
+
+function handleActivity(): void {
+  lastActivityAt = Date.now();
+}
+
 function stopInterval(): void {
   if (timerHandle !== null) {
     clearInterval(timerHandle);
@@ -58,6 +97,8 @@ const initialState: FocusState = {
   outerColor: FOCUS_DEFAULTS.outerColor,
   breakInnerColor: FOCUS_DEFAULTS.breakInnerColor,
   breakOuterColor: FOCUS_DEFAULTS.breakOuterColor,
+  breakReminderEnabled: FOCUS_DEFAULTS.breakReminder,
+  breakReminderTriggered: false,
 };
 
 type FocusActions = {
@@ -77,7 +118,9 @@ type FocusActions = {
   setTotalSessions: (count: number) => void;
   setInnerColor: (color: string) => void;
   setOuterColor: (color: string) => void;
-  
+  setBreakReminder: (enabled: boolean) => void;
+  setBreakReminderTriggered: (triggered: boolean) => void;
+
   // Internal
   _setCompletedWorkSessions: (count: number) => void;
   _hydrateCompletedSessions: () => void;
@@ -90,7 +133,7 @@ export const useFocusStore = create<FocusState & FocusActions>()(
 
       // Timer actions
       startTimer: () => {
-        const { isRunning, timeLeft, duration } = get();
+        const { isRunning, timeLeft, duration, breakReminderEnabled } = get();
         if (isRunning) return;
         if (timeLeft <= 0) {
           set({ timeLeft: duration, currentSessionProgress: 0 });
@@ -100,10 +143,14 @@ export const useFocusStore = create<FocusState & FocusActions>()(
         stopInterval();
         timerHandle = setInterval(() => get().tick(), 1000);
         set({ isRunning: true });
+
+        // Mola hatirlaticisini baslat (Feature 9)
+        if (breakReminderEnabled) startBreakReminderMonitor(get);
       },
 
       pauseTimer: () => {
         stopInterval();
+        stopBreakReminderMonitor();
         if (get().isRunning) set({ isRunning: false });
       },
 
@@ -114,6 +161,7 @@ export const useFocusStore = create<FocusState & FocusActions>()(
         set({ 
           timeLeft: duration, 
           currentSessionProgress: 0,
+          breakReminderTriggered: false,
         });
       },
 
@@ -276,6 +324,21 @@ export const useFocusStore = create<FocusState & FocusActions>()(
         set({ outerColor: color });
       },
 
+      setBreakReminder: (enabled: boolean) => {
+        setSetting(FOCUS_SETTINGS_KEYS.breakReminder, String(enabled));
+        set({ breakReminderEnabled: enabled });
+        if (enabled) {
+          startBreakReminderMonitor(get);
+        } else {
+          stopBreakReminderMonitor();
+          set({ breakReminderTriggered: false });
+        }
+      },
+
+      setBreakReminderTriggered: (triggered: boolean) => {
+        set({ breakReminderTriggered: triggered });
+      },
+
       // Internal
       _setCompletedWorkSessions: (count: number) => {
         setSetting(FOCUS_SETTINGS_KEYS.completedWorkSessions, String(count));
@@ -325,6 +388,8 @@ export const useFocusInnerColor = () => useFocusStore((s) => s.innerColor);
 export const useFocusOuterColor = () => useFocusStore((s) => s.outerColor);
 export const useFocusBreakInnerColor = () => useFocusStore((s) => s.breakInnerColor);
 export const useFocusBreakOuterColor = () => useFocusStore((s) => s.breakOuterColor);
+export const useFocusBreakReminder = () => useFocusStore((s) => s.breakReminderEnabled);
+export const useFocusBreakReminderTriggered = () => useFocusStore((s) => s.breakReminderTriggered);
 export const useFocusActions = () => useFocusStore((s) => ({
   startTimer: s.startTimer,
   pauseTimer: s.pauseTimer,
@@ -334,4 +399,19 @@ export const useFocusActions = () => useFocusStore((s) => ({
   setTotalSessions: s.setTotalSessions,
   setInnerColor: s.setInnerColor,
   setOuterColor: s.setOuterColor,
+  setBreakReminder: s.setBreakReminder,
+  setBreakReminderTriggered: s.setBreakReminderTriggered,
 }));
+
+// Masa'etgen etkinlik dinleyicileri (mola hatirlaticisi icin).
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  const activityHandler = () => handleActivity();
+  document.addEventListener('mousemove', activityHandler, { passive: true });
+  document.addEventListener('mousedown', activityHandler, { passive: true });
+  document.addEventListener('touchstart', activityHandler, { passive: true });
+  document.addEventListener('keydown', activityHandler, { passive: true });
+  window.addEventListener('blur', () => {
+    // Pencere odaklanmadiiginda sure durdugu surece timer'i sifirla
+    lastActivityAt = Date.now();
+  });
+}

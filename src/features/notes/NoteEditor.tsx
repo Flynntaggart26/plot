@@ -12,7 +12,9 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { useTheme } from '@/ui/theme';
+import { AppText } from '@/ui/components/Screen';
 import { Button } from '@/ui/components/Button';
+import { Chip } from '@/ui/components/Chip';
 import { haptic } from '@/lib/haptics';
 import { toast } from '@/lib/toast';
 import { extractWikiLinks } from './service';
@@ -27,6 +29,25 @@ export type NoteEditorProps = {
   busy?: boolean;
   error?: string | null;
 };
+
+/** Şablon önekleri (settings'te key='note_templates' olarak saklanır). */
+const DEFAULT_TEMPLATES: { key: string; title: string; body: string }[] = [
+  {
+    key: 'gunluk',
+    title: 'Günlük',
+    body: `# ${new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}\n\n## Niyet\nBugün ne yapmak istiyorum?\n\n## Akış\n- \n- \n- \n\n## Değerlendirme\nBugünü nasıl değerlendiriyorum?\n`,
+  },
+  {
+    key: 'toplanti',
+    title: 'Toplantı',
+    body: `# Toplantı Notu\n\n**Konu:** \n**Katılımcılar:** \n**Tarih:** ${new Date().toLocaleDateString('tr-TR')}\n\n## Gündem\n- \n- \n\n## Kararlar\n- \n\n## Aksiyonlar\n- [ ] \n- [ ] \n`,
+  },
+  {
+    key: 'karar',
+    title: 'Karar',
+    body: `# Karar\n\n**Konu:** \n**Tarih:** ${new Date().toLocaleDateString('tr-TR')}\n\n## Seçenekler\n- \n- \n\n## Karar\n\n## Neden\n\n## Sonraki Adımlar\n- \n`,
+  },
+];
 
 /**
  * Not editörü. Alanlar odaklandığında çerçeve vurguya döner; kaydetme
@@ -50,7 +71,16 @@ export function NoteEditor({
     { start: number; end: number } | undefined
   >(undefined);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
   const textRef = useRef<TextInputInstance | null>(null);
+
+  const applyTemplate = (template: string) => {
+    const next = body ? `${body}\n\n---\n\n${template}` : template;
+    setBody(next);
+    setTemplateOpen(false);
+    haptic('light');
+    toast('Şablon eklendi');
+  };
 
   const insertLink = (picked: string) => {
     const clean = picked.trim();
@@ -188,6 +218,40 @@ export function NoteEditor({
           icon="link-outline"
           onPress={() => setPickerOpen(true)}
         />
+
+        <Button
+          label="Şablon"
+          variant="ghost"
+          icon="copy-outline"
+          onPress={() => setTemplateOpen(true)}
+        />
+
+        {templateOpen ? (
+          <View
+            style={{
+              gap: sp.xs,
+              marginTop: sp.xs,
+              paddingHorizontal: sp.md,
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderTopColor: c.border,
+              paddingTop: sp.sm,
+            }}
+          >
+            <AppText variant="meta" muted style={{ letterSpacing: 0.6 }}>
+              ŞABLON
+            </AppText>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: sp.xs }}>
+              {DEFAULT_TEMPLATES.map((tpl) => (
+                <Chip
+                  key={tpl.key}
+                  label={tpl.title}
+                  selected={false}
+                  onPress={() => applyTemplate(tpl.body)}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
 
         <NotePickerSheet
           visible={pickerOpen}

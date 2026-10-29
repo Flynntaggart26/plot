@@ -119,7 +119,7 @@ export function exportToMarkdown(data: BackupData): string {
     `Oluşturulma: ${formatDateTime(data.exportedAt)}`,
     `Şema sürümü: ${data.schemaVersion}`,
     '',
-    '## Özet',
+    '# Özet',
     '',
     `- Görevler: ${openTasks.length} açık · ${doneTasks.length} tamamlanan`,
     `- Notlar: ${data.notes.length}`,
@@ -133,7 +133,7 @@ export function exportToMarkdown(data: BackupData): string {
     '',
   );
 
-  push('## Açık Görevler', '');
+  push('# Açık Görevler', '');
   if (openTasks.length === 0) {
     push('_Açık görev yok._');
   } else {
@@ -141,7 +141,7 @@ export function exportToMarkdown(data: BackupData): string {
   }
   push('');
 
-  push('## Tamamlanan Görevler', '');
+  push('# Tamamlanan Görevler', '');
   if (doneTasks.length === 0) {
     push('_Henüz tamamlanan görev yok._');
   } else {
@@ -149,7 +149,7 @@ export function exportToMarkdown(data: BackupData): string {
   }
   push('');
 
-  push('## Notlar', '');
+  push('# Notlar', '');
   if (data.notes.length === 0) {
     push('_Not yok._');
   } else {
@@ -160,7 +160,7 @@ export function exportToMarkdown(data: BackupData): string {
   }
   push('');
 
-  push('## Fikirler', '');
+  push('# Fikirler', '');
   if (data.ideas.length === 0) {
     push('_Fikir yok._');
   } else {
@@ -175,7 +175,7 @@ export function exportToMarkdown(data: BackupData): string {
 
   push('');
 
-  push('## Odak Oturumları', '');
+  push('# Odak Blokları', '');
   if (data.focusSessions.length === 0) {
     push('_Odak oturumu yok._');
   } else {
@@ -190,7 +190,7 @@ export function exportToMarkdown(data: BackupData): string {
   }
   push('');
 
-  push('## Günlük Planlar', '');
+  push('# Günlük Planlar', '');
   if (data.dailyPlans.length === 0) {
     push('_Günlük plan yok._');
   } else {

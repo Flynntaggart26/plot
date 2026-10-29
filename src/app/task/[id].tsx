@@ -47,6 +47,7 @@ export default function TaskDetailScreen() {
         estimateMin: values.estimateMin,
         energy: values.energy,
         mustDo: values.mustDo,
+        audioPath: values.audioPath,
       },
       {
         onSuccess: () => {

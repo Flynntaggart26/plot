@@ -185,3 +185,35 @@ export function unscheduleTask(taskId: string): Task {
   if (!updated) throw new Error('Görev bulunamadı');
   return updated;
 }
+
+/** Haftalık kapasite uyarısı: 7 günlük planlanan süre toplamı (dk). */
+export function getWeekCapacity(weekStart: string = weekStartKey()): {
+  totalMin: number;
+  overLimit: boolean;
+  limitMin: number;
+} {
+  const db = getDb();
+  const startDate = dateFromDayKey(weekStart);
+  const endDate = addLocalDays(startDate, 7);
+
+  const rows = db
+    .select({ duration: tasks.duration })
+    .from(tasks)
+    .where(
+      and(
+        gte(tasks.scheduledAt, startDate.toISOString()),
+        lt(tasks.scheduledAt, endDate.toISOString()),
+        eq(tasks.status, 'open'),
+      ),
+    )
+    .all();
+
+  const totalMin = rows.reduce((sum, r) => sum + (r.duration ?? 0), 0);
+  const limitMin = 20 * 60; // 20 saat = 1200 dk
+
+  return {
+    totalMin,
+    overLimit: totalMin > limitMin,
+    limitMin,
+  };
+}

@@ -80,9 +80,9 @@ export function useUpdateTask(id: string) {
 export function useDeleteTask() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => {
-      deleteTask(id);
-      return Promise.resolve(id);
+    mutationFn: async (id: string) => {
+      await deleteTask(id);
+      return id;
     },
     onSuccess: (id) => {
       queryClient.removeQueries({ queryKey: taskKeys.detail(id) });

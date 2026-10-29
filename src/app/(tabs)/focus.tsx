@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
-import { View, StyleSheet, Text, SafeAreaView } from 'react-native';
+import { View, StyleSheet, Text, SafeAreaView, Switch } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/ui/theme';
 import { haptic } from '@/lib/haptics';
+import { toast } from '@/lib/toast';
 import { useFocusStore } from '@/features/focus/store';
 import { RingSVG } from '@/features/focus/RingSVG';
 import { SessionDots } from '@/features/focus/SessionDots';
@@ -12,6 +13,7 @@ import { ColorPickers } from '@/features/focus/ColorPickers';
 import { StartButton } from '@/features/focus/StartButton';
 import { formatTime } from '@/features/focus/utils';
 import { FOCUS_RING_CONSTANTS } from '@/features/focus/SegmentPath';
+import { AppText } from '@/ui/components/Screen';
 
 export default function FocusScreen() {
   const insets = useSafeAreaInsets();
@@ -31,6 +33,12 @@ export default function FocusScreen() {
   const breakInnerColor = useFocusStore(s => s.breakInnerColor);
   const breakOuterColor = useFocusStore(s => s.breakOuterColor);
   
+  // Break reminder (Feature 9)
+  const breakReminderEnabled = useFocusStore(s => s.breakReminderEnabled);
+  const breakReminderTriggered = useFocusStore(s => s.breakReminderTriggered);
+  const setBreakReminder = useFocusStore(s => s.setBreakReminder);
+  const setBreakReminderTriggered = useFocusStore(s => s.setBreakReminderTriggered);
+
   // Actions
   const startTimer = useFocusStore(s => s.startTimer);
   const pauseTimer = useFocusStore(s => s.pauseTimer);
@@ -63,6 +71,14 @@ export default function FocusScreen() {
       haptic('success');
     }
   }, [timeLeft, isRunning, duration]);
+
+  // Break reminder toast (Feature 9)
+  useEffect(() => {
+    if (breakReminderTriggered) {
+      toast('Ara? 2 dakika hareketsiz.');
+      setBreakReminderTriggered(false);
+    }
+  }, [breakReminderTriggered, setBreakReminderTriggered]);
 
   // Handle timer completion
   const handleTimerPress = useCallback(() => {
@@ -159,6 +175,26 @@ export default function FocusScreen() {
             </View>
 
             <ColorPickers />
+
+            {/* Mola hatirlaticisi (Feature 9) */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingVertical: space.xs,
+              }}
+            >
+              <AppText variant="bodyStrong">Mola hatirlaticisi</AppText>
+              <Switch
+                value={breakReminderEnabled}
+                onValueChange={(next) => {
+                  haptic('tick');
+                  setBreakReminder(next);
+                }}
+                trackColor={{ false: c.border, true: c.focus }}
+              />
+            </View>
 
             {/* Start Button */}
             <StartButton

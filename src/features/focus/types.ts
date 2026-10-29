@@ -19,6 +19,10 @@ export interface FocusState {
   outerColor: string;      // Çalışma dış halka / segmentler
   breakInnerColor: string; // Mola iç halka (sabit)
   breakOuterColor: string; // Mola dış halka / segmentler (sabit)
+
+  // Mola hatırlatıcısı (Feature 9)
+  breakReminderEnabled: boolean;
+  breakReminderTriggered: boolean;
 }
 
 // Veritabanı ayar anahtarları
@@ -28,6 +32,7 @@ export const FOCUS_SETTINGS_KEYS = {
   innerColor: 'focus_inner_color',
   outerColor: 'focus_outer_color',
   completedWorkSessions: 'focus_completed_work_sessions',
+  breakReminder: 'focus_break_reminder',
 } as const;
 
 // Varsayılan değerler
@@ -39,4 +44,5 @@ export const FOCUS_DEFAULTS = {
   breakInnerColor: '#FF6B2E', // turuncu
   breakOuterColor: '#FF9F5A', // açık turuncu
   completedWorkSessions: 0,
+  breakReminder: false,
 } as const;

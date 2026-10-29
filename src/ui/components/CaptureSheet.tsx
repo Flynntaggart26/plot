@@ -130,9 +130,13 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
         />
       </Animated.View>
 
-      <View style={styles.bottom} pointerEvents="box-none">
+      <View
+        style={styles.bottom}
+        pointerEvents={open ? 'box-none' : 'none'}
+      >
         <Animated.View
           onLayout={(event) => height.set(event.nativeEvent.layout.height)}
+          pointerEvents={open ? 'auto' : 'none'}
           style={[
             styles.sheet,
             {

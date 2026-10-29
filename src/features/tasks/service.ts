@@ -33,6 +33,8 @@ export type CreateTaskInput = {
   mustDo?: boolean;
   /** ISO-8601 UTC. Verilmezse şimdi. `null` bilinçli olarak tarihsiz bırakır. */
   scheduledAt?: string | null;
+  /** Ses kaydı dosya yolu (Feature 6 – Voice-to-Task). */
+  audioPath?: string | null;
 };
 
 export type UpdateTaskInput = {
@@ -42,6 +44,8 @@ export type UpdateTaskInput = {
   energy?: TaskEnergy | null;
   mustDo?: boolean;
   scheduledAt?: string | null;
+  /** Ses kaydı dosya yolu (Feature 6 – Voice-to-Task). */
+  audioPath?: string | null;
 };
 
 /** Kullanıcıya gösterilebilir, beklenen hata. */
@@ -111,6 +115,8 @@ export function createTask(input: CreateTaskInput): Task {
         estimateMin: input.estimateMin ?? null,
         energy: input.energy ?? null,
         scheduledAt: input.scheduledAt === undefined ? now : input.scheduledAt,
+        duration: null,
+        audioPath: input.audioPath ?? null,
         status: 'open',
         createdAt: now,
       })
@@ -169,6 +175,11 @@ export function updateTask(id: string, patch: UpdateTaskInput): Task {
   if (patch.scheduledAt !== undefined && patch.scheduledAt !== current.scheduledAt) {
     changes.scheduledAt = patch.scheduledAt;
     changed.push('scheduledAt');
+  }
+
+  if (patch.audioPath !== undefined && patch.audioPath !== current.audioPath) {
+    changes.audioPath = patch.audioPath;
+    changed.push('audioPath');
   }
 
   if (patch.mustDo !== undefined) {
@@ -272,8 +283,23 @@ export function reopenTask(id: string): Task {
   return updated;
 }
 
-export function deleteTask(id: string): void {
-  getDb().delete(tasks).where(eq(tasks.id, id)).run();
+export async function deleteTask(id: string): Promise<void> {
+  const db = getDb();
+  const current = getTask(id);
+  if (!current) return;
+
+  // Ses kaydı dosyasını sil (Feature 6 – Voice-to-Task).
+  if (current.audioPath) {
+    try {
+      // expo-file-system dinamik import: web'de yoksa sessizce atlanır.
+      const { FileSystem } = (await import('expo-file-system')) as any;
+      await FileSystem.deleteAsync(current.audioPath, { idempotent: true }).catch(() => {});
+    } catch {
+      // Dosya silme hatası görev silmeyi engellemez.
+    }
+  }
+
+  db.delete(tasks).where(eq(tasks.id, id)).run();
 }
 
 /** Bugünün görevleri: bugüne planlananlar + açık must-do'lar + bugün tamamlananlar. */

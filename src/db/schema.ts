@@ -67,6 +67,10 @@ export const tasks = sqliteTable(
     dueAt: text('due_at'),
     /** Gün içi planlama: görevin yerleştirildiği an (ISO UTC). */
     scheduledAt: text('scheduled_at'),
+    /** Tahmini süre (dk) – Hafta kapasite uyarısı için kullanılır. */
+    duration: integer('duration'),
+    /** Ses kaydı dosya yolu (Feature 6 – Voice-to-Task). */
+    audioPath: text('audio_path'),
     energy: text('energy', { enum: ['low', 'mid', 'high'] }),
     sortOrder: integer('sort_order').notNull().default(0),
     recurringRule: text('recurring_rule'),
@@ -183,6 +187,8 @@ export const ideas = sqliteTable(
       .notNull()
       .default('spark'),
     source: text('source'),
+    /** Ses kaydı dosya yolu (Feature 6 – Voice-to-Task). */
+    audioPath: text('audio_path'),
     createdAt: text('created_at').notNull().default(now),
   },
   (table) => [
