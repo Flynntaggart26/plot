@@ -12,6 +12,25 @@ import {
   FOCUS_DEFAULTS,
   FOCUS_SETTINGS_KEYS,
 } from './types';
+import { recordFocusSession } from './service';
+
+/**
+ * Zamanlayici tutamaci bilincli olarak modul seviyesinde yasar:
+ * - `setInterval` kimligi JSON'a serilemez, zustand persist'e giremez.
+ * - State'e yazmak her saniye tum odak ekranini yeniden cizerdi.
+ * - Tek bir tutamac tutmak, duraklat/devam arasinda interval sizmasini onler.
+ */
+let timerHandle: ReturnType<typeof setInterval> | null = null;
+/** Calisan blogun baslangic ani (ISO). Duraklatma bunu sifirlamaz. */
+let sessionStartedAt: string | null = null;
+
+function stopInterval(): void {
+  if (timerHandle !== null) {
+    clearInterval(timerHandle);
+    timerHandle = null;
+  }
+}
+
 
 // SQLite-based storage adapter for Zustand persist (uses settings table)
 const sqliteStorage = {
@@ -39,7 +58,6 @@ const initialState: FocusState = {
   outerColor: FOCUS_DEFAULTS.outerColor,
   breakInnerColor: FOCUS_DEFAULTS.breakInnerColor,
   breakOuterColor: FOCUS_DEFAULTS.breakOuterColor,
-  timerId: null,
 };
 
 type FocusActions = {
@@ -62,7 +80,6 @@ type FocusActions = {
   
   // Internal
   _setCompletedWorkSessions: (count: number) => void;
-  _setTimerId: (id: ReturnType<typeof setInterval> | null) => void;
   _hydrateCompletedSessions: () => void;
 };
 
@@ -78,22 +95,22 @@ export const useFocusStore = create<FocusState & FocusActions>()(
         if (timeLeft <= 0) {
           set({ timeLeft: duration, currentSessionProgress: 0 });
         }
-        
-        setInterval(() => get().tick(), 1000);
+
+        if (!sessionStartedAt) sessionStartedAt = new Date().toISOString();
+        stopInterval();
+        timerHandle = setInterval(() => get().tick(), 1000);
         set({ isRunning: true });
       },
 
       pauseTimer: () => {
-        const { timerId } = get();
-        if (timerId) {
-          clearInterval(timerId);
-          set({ isRunning: false });
-        }
+        stopInterval();
+        if (get().isRunning) set({ isRunning: false });
       },
 
       resetTimer: () => {
         const { duration } = get();
         get().pauseTimer();
+        sessionStartedAt = null;
         set({ 
           timeLeft: duration, 
           currentSessionProgress: 0,
@@ -125,30 +142,56 @@ export const useFocusStore = create<FocusState & FocusActions>()(
 
       // Mode actions
       setMode: (mode: FocusMode) => {
-        const { duration } = get();
-        
         get().pauseTimer();
-        
+        sessionStartedAt = null;
+
         if (mode === 'work') {
-          // Mola → Çalışma: completedWorkSessions KORUNUR
-          set({ 
+          // Mola → Çalışma: completedWorkSessions KORUNUR, süre kullanıcı ayarına döner.
+          const stored = getSetting(FOCUS_SETTINGS_KEYS.duration);
+          const minutes = stored ? parseInt(stored, 10) : FOCUS_DEFAULTS.duration;
+          const safeMinutes =
+            Number.isFinite(minutes) && minutes > 0 ? minutes : FOCUS_DEFAULTS.duration;
+          set({
             mode: 'work',
-            timeLeft: duration,
+            duration: safeMinutes * 60,
+            timeLeft: safeMinutes * 60,
             currentSessionProgress: 0,
           });
         } else {
-          // Çalışma → Mola: progress sıfırla
-          set({ 
+          // Çalışma → Mola: döngü bittiyse uzun, aksi halde kısa mola.
+          const { completedWorkSessions, totalSessions } = get();
+          const breakMinutes = completedWorkSessions >= totalSessions ? 15 : 5;
+          set({
             mode: 'break',
+            duration: breakMinutes * 60,
+            timeLeft: breakMinutes * 60,
             currentSessionProgress: 0,
           });
         }
       },
 
       completeWorkSession: () => {
-        const { completedWorkSessions, totalSessions } = get();
+        const { completedWorkSessions, totalSessions, duration } = get();
         const newCompleted = completedWorkSessions + 1;
-        
+
+        // Tamamlanan bloğu veritabanına yaz: istatistikler buradan beslenir.
+        // Kayıt başarısız olsa bile zamanlayıcı akışı durmamalı.
+        try {
+          const endedAt = new Date().toISOString();
+          const startedAt =
+            sessionStartedAt ?? new Date(Date.now() - duration * 1000).toISOString();
+          const minutes = Math.max(1, Math.round(duration / 60));
+          recordFocusSession({
+            startedAt,
+            endedAt,
+            plannedMin: minutes,
+            actualMin: minutes,
+          });
+        } catch (cause) {
+          console.warn('Odak oturumu kaydedilemedi:', cause);
+        }
+        sessionStartedAt = null;
+
         if (newCompleted >= totalSessions) {
           // Tüm çalışmalar bitti → Uzun mola (15 dk)
           set({ 
@@ -171,17 +214,24 @@ export const useFocusStore = create<FocusState & FocusActions>()(
       },
 
       completeBreakSession: () => {
-        const { completedWorkSessions } = get();
-        // Mola bitti → Çalışma'ya dön
-        // Kullanıcının ayarladığı süreye geri dön
+        const { completedWorkSessions, totalSessions } = get();
+        // Mola bitti → Çalışma'ya dön. Döngü tamamlandıysa yeni tura başla.
+        // Kullanıcının ayarladığı süreye geri dön.
         const storedDuration = getSetting(FOCUS_SETTINGS_KEYS.duration);
         const durationMinutes = storedDuration ? parseInt(storedDuration, 10) : FOCUS_DEFAULTS.duration;
-        
+        const safeMinutes =
+          Number.isFinite(durationMinutes) && durationMinutes > 0
+            ? durationMinutes
+            : FOCUS_DEFAULTS.duration;
+        const nextCompleted =
+          completedWorkSessions >= totalSessions ? 0 : completedWorkSessions;
+
+        sessionStartedAt = null;
         set({ 
           mode: 'work',
-          duration: durationMinutes * 60,
-          timeLeft: durationMinutes * 60,
-          completedWorkSessions: completedWorkSessions, // KORUNUR
+          duration: safeMinutes * 60,
+          timeLeft: safeMinutes * 60,
+          completedWorkSessions: nextCompleted,
           currentSessionProgress: 0,
         });
       },
@@ -230,10 +280,6 @@ export const useFocusStore = create<FocusState & FocusActions>()(
       _setCompletedWorkSessions: (count: number) => {
         setSetting(FOCUS_SETTINGS_KEYS.completedWorkSessions, String(count));
         set({ completedWorkSessions: count });
-      },
-
-      _setTimerId: (id: ReturnType<typeof setInterval> | null) => {
-        set({ timerId: id });
       },
 
       _hydrateCompletedSessions: () => {

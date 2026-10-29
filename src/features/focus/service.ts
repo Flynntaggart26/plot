@@ -22,6 +22,40 @@ export type UpdateFocusSessionInput = {
  * focus_sessions tablosu zaten schema'da tanımlı.
  */
 
+/**
+ * Tamamlanmis bir odak blogunu tek adimda kaydeder.
+ *
+ * Pomodoro zamanlayicisi oturumu baslattigi ani ve bittigi ani kendi tutar;
+ * bu fonksiyon iki damgayi da oldugu gibi yazar. Boylece istatistikler
+ * "ne zaman basladi" sorusuna dogru cevap verebilir.
+ */
+export function recordFocusSession(input: {
+  startedAt: string;
+  endedAt: string;
+  plannedMin: number;
+  actualMin: number;
+  taskId?: string | null;
+}): FocusSession {
+  const id = newId();
+  getDb()
+    .insert(focusSessions)
+    .values({
+      id,
+      taskId: input.taskId ?? null,
+      plannedMin: Math.max(1, Math.round(input.plannedMin)),
+      actualMin: Math.max(0, Math.round(input.actualMin)),
+      interruptions: 0,
+      mood: null,
+      startedAt: input.startedAt,
+      endedAt: input.endedAt,
+    })
+    .run();
+
+  const created = getFocusSession(id);
+  if (!created) throw new Error('Odak oturumu kaydedilemedi.');
+  return created;
+}
+
 export function createFocusSession(input: CreateFocusSessionInput): FocusSession {
   const db = getDb();
   const id = newId();

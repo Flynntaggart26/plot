@@ -33,6 +33,8 @@ Plot is a local-first productivity mobile application designed for ADHD-friendly
 - **Plan that moves**: A seven-column week view with real drag-and-drop. Drag a task from the "unplanned" tray into a day, drag it between days, or drop it back to unplan it. The month grid opens the week on the day you tap.
 - **Notes that connect**: `[[Başlık]]` links resolve to real notes. Unresolved links become one-tap "create this note" actions, every note lists its backlinks, and Turkish-aware search covers both titles and bodies.
 - **Zero friction**: Works fully offline with SQLite on-device. No sign-up, no tracking, no cloud.
+- **Proof of progress**: A statistics screen turns focus blocks and completed tasks into a seven- or thirty-day chart, a streak, a best day and library counts - read straight from SQLite.
+- **Yours to keep**: Export everything as JSON or a readable Markdown summary, then restore a JSON backup with a two-step, transactional import.
 
 ## Tech Stack
 
@@ -50,7 +52,7 @@ Plot is a local-first productivity mobile application designed for ADHD-friendly
 | Fonts | [Inter](https://rsms.me/inter/) + [Instrument Serif](https://fonts.google.com/specimen/Instrument+Serif) | Design system typography |
 | Language | TypeScript 6 | Type safety across the codebase |
 
-## Features (0.3.0 — Shipped)
+## Features (0.5.0 - Shipped)
 
 ### Today (`/`)
 - **Energy selector**: Persisted 1–5 subjective energy level for the day.
@@ -89,6 +91,26 @@ Plot is a local-first productivity mobile application designed for ADHD-friendly
 - **Mode toggle**: Pill-style Work/Break switch with animated indicator.
 - **Persisted settings**: Duration, sessions, colors, completed sessions survive app restarts.
 - **60 fps Reanimated**: Smooth ring progress, segment fills, pulse animation. Respects `prefers-reduced-motion`.
+- **Session log**: Every completed work block is written to `focus_sessions` with start/end timestamps, so statistics survive restarts.
+
+### Statistics (`/stats`) - 0.5.0
+- **Seven or thirty day window**: Segmented control switches the range; the chart never hides empty days.
+- **Daily activity chart**: Dependency-free bar chart (React Native views) height = focus minutes + completed tasks. Tap a day for its exact numbers.
+- **Streak and best day**: Streak counts consecutive active days and forgives a still-empty today; best day and average per active day sit beside it.
+- **Library counts**: Notes, idea statuses (spark / saved / committed) and open tasks are read from SQLite, not from counters held in memory.
+
+### Tangent (`/tangent`) - 0.5.0
+- **QuickSpark**: One-line capture at the top of the list. Type, press Enter, the spark is saved; no form required.
+- **Status filters**: All / spark / saved / committed / archived chips with live counts and a filter-specific empty state.
+- **Idea to action**: A spark can become a task or a note in one tap; the idea is marked committed and the new record opens, so the thought is not lost.
+- **Calm by default**: Ideas are allowed to stay sparks. Nothing nags you to mature them.
+
+### Data & backup (`/settings/data`) - 0.5.0
+- **File-based export**: On desktop the native save dialog writes `plot-yedek-YYYY-MM-DD.json`; in the browser the same file downloads. No clipboard round-trip.
+- **Readable Markdown**: A second export produces a human-friendly summary - task states, notes, ideas, focus blocks and daily plans.
+- **File-based import with confirmation**: Picking a `.json` file only stages it; a second, explicit "Geri yükle" replaces the database inside a transaction.
+- **Refresh after import**: All TanStack queries are dropped, so every screen reads the restored data immediately.
+
 
 ### Database (SQLite + Drizzle)
 15 tables: `areas`, `projects`, `tasks`, `task_events`, `focus_sessions`, `notes`, `note_links`, `tags`, `note_tags`, `ideas`, `daily_plans`, `chat_threads`, `chat_messages`, `ai_runs`, `settings`.
@@ -98,13 +120,15 @@ Plot is a local-first productivity mobile application designed for ADHD-friendly
 
 ### Desktop niceties
 - **Keyboard capture**: `N` for a new note, `I` for an idea, `T` for a task, `C` for the capture sheet, and `⌘/Ctrl+K` from anywhere. Shortcuts stay out of the way while you type.
+- **Share-to-Plot**: `Ctrl+Shift+Space` works while Plot is in the background. Rust registers the global shortcut, brings the window forward and opens the capture sheet with the input focused; type and press Enter.
 - **Confirmation toasts**: Save, update and delete actions confirm in a short pill above the tab bar instead of leaving the screen silent.
 - **Motion with an off switch**: Warm metal sheen, a sliding tab lamp and animated check circles carry state changes; every decorative animation disappears when the OS "reduce motion" preference is on.
 
-### Deferred (0.5.0+)
+### Deferred (0.6.0+)
 - Notes: graph view and full-text index for large libraries.
 - Plan: week-level capacity warnings.
-- Share-to-Plot intent (needs native module + dev build).
+- Native share intent on mobile (the desktop global shortcut covers Windows).
+- Custom theme editor.
 
 ---
 
@@ -150,7 +174,7 @@ npm run web:isolated
 
 ### Windows desktop (`.exe`)
 
-The desktop app is a Tauri 2 shell around the same Expo web build; Rust only hosts the WebView and the bundled assets. `src-tauri/tauri.conf.json` sends COEP/COOP on every WebView response (`app.security.headers`), so `SharedArrayBuffer` — and therefore SQLite — works like `web:preview`.
+The desktop app is a Tauri 2 shell around the same Expo web build; Rust hosts the WebView, serves the bundled assets, writes/reads backup files chosen in the native dialogs, and registers the `Ctrl+Shift+Space` quick-capture shortcut. `src-tauri/tauri.conf.json` sends COEP/COOP on every WebView response (`app.security.headers`), so `SharedArrayBuffer` — and therefore SQLite — works like `web:preview`.
 
 ```bash
 npm run web:export      # dist/

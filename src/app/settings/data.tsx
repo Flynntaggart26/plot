@@ -1,136 +1,191 @@
 import React, { useCallback, useState } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-  type TextStyle,
-  type ViewStyle,
-} from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
+
+import { SubHeader } from '@/ui/components/SubHeader';
+import { AppText } from '@/ui/components/Screen';
+import { Button } from '@/ui/components/Button';
 import { useTheme } from '@/ui/theme';
 import { haptic } from '@/lib/haptics';
-import { usePressScale } from '@/ui/motion/hooks';
-import { exportAllData, exportToMarkdown, importAllData } from '@/features/backup/service';
-import { SubHeader } from '@/ui/components/SubHeader';
-import { space, radius } from '@/ui/tokens';
+import { localDayKey } from '@/lib/date';
+import { copyToClipboard, isTauriRuntime, pickTextFile, saveTextFile } from '@/lib/file-transfer';
+import {
+  exportAllData,
+  exportToMarkdown,
+  importAllData,
+  parseBackupText,
+  type BackupData,
+} from '@/features/backup/service';
 
-const HAIRLINE = 1;
+type Status = { type: 'success' | 'error' | 'info'; message: string };
 
+type PendingImport = {
+  name: string;
+  data: BackupData;
+  tasks: number;
+  notes: number;
+  ideas: number;
+  focusSessions: number;
+};
+
+function byteLength(text: string): number {
+  if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(text).length;
+  return text.length;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Veri ve yedekleme ekranı.
+ *
+ * Yedek artık panoya değil dosyaya gider: masaüstünde yerel kaydetme penceresi,
+ * tarayıcıda indirme. İçe aktarma iki adımlıdır çünkü mevcut verinin üzerine
+ * yazar; dosya seçmek tek başına geri yükleme sayılmaz.
+ */
 export default function DataScreen() {
-  const { c, space: sp } = useTheme();
-  const { handlers: pressHandlers } = usePressScale();
-  const [exportText, setExportText] = useState('');
-  const [markdownText, setMarkdownText] = useState('');
-  const [importText, setImportText] = useState('');
-  const [isExporting, setIsExporting] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const { c, space, radius } = useTheme();
+  const queryClient = useQueryClient();
 
-  const handleExport = useCallback(() => {
-    setIsExporting(true);
+  const [status, setStatus] = useState<Status | null>(null);
+  const [busy, setBusy] = useState<'json' | 'markdown' | 'import' | null>(null);
+  const [pending, setPending] = useState<PendingImport | null>(null);
+  const [lastFile, setLastFile] = useState<{ name: string; bytes: number } | null>(null);
+
+  const runExport = useCallback(
+    async (kind: 'json' | 'markdown') => {
+      setBusy(kind);
+      setStatus(null);
+      try {
+        const data = exportAllData();
+        const isJson = kind === 'json';
+        const contents = isJson ? JSON.stringify(data, null, 2) : exportToMarkdown(data);
+        const name = `plot-yedek-${localDayKey()}.${isJson ? 'json' : 'md'}`;
+
+        const result = await saveTextFile({
+          defaultName: name,
+          contents,
+          extension: isJson ? 'json' : 'md',
+          description: isJson ? 'Plot JSON yedeği' : 'Plot Markdown yedeği',
+          mimeType: isJson ? 'application/json' : 'text/markdown;charset=utf-8',
+        });
+
+        if (!result.saved) {
+          setStatus({ type: 'info', message: 'Kaydetme iptal edildi; dosya oluşturulmadı.' });
+          return;
+        }
+
+        const bytes = byteLength(contents);
+        setLastFile({ name, bytes });
+        setStatus({ type: 'success', message: `Yedek kaydedildi (${formatBytes(bytes)}).` });
+        haptic('success');
+      } catch (error) {
+        setStatus({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Yedek oluşturulamadı.',
+        });
+        haptic('light');
+      } finally {
+        setBusy(null);
+      }
+    },
+    [],
+  );
+
+  const copyJson = useCallback(async () => {
+    setBusy('json');
+    setStatus(null);
     try {
       const data = exportAllData();
-      const json = JSON.stringify(data, null, 2);
-      const md = exportToMarkdown(data);
-      setExportText(json);
-      setMarkdownText(md);
-      setStatus({ type: 'success', message: 'Yedek olu\u015fturuldu.' });
-      haptic('success');
+      const ok = await copyToClipboard(JSON.stringify(data, null, 2));
+      setStatus({
+        type: ok ? 'success' : 'error',
+        message: ok ? 'JSON yedeği panoya kopyalandı.' : 'Panoya kopyalama desteklenmiyor.',
+      });
+      if (ok) haptic('success');
     } catch (error) {
-      setStatus({ type: 'error', message: (error as Error).message });
-      haptic('light');
+      setStatus({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Panoya kopyalanamadı.',
+      });
     } finally {
-      setIsExporting(false);
+      setBusy(null);
     }
   }, []);
 
-  const handleImport = useCallback(() => {
-    if (!importText.trim()) {
-      setStatus({ type: 'error', message: 'L\u00fctfen ge\u00e7erli bir JSON yap\u0131\u015ft\u0131r\u0131n.' });
-      haptic('light');
-      return;
-    }
-    setIsImporting(true);
+  const pickBackup = useCallback(async () => {
+    setBusy('import');
+    setStatus(null);
+    setPending(null);
     try {
-      const data = JSON.parse(importText);
-      importAllData(data);
-      setStatus({ type: 'success', message: 'Veri ba\u015far\u0131yla i\u00e7eri aktar\u0131ld\u0131.' });
-      haptic('success');
+      const file = await pickTextFile({ extensions: ['json'], description: 'Plot JSON yedeği' });
+      if (!file) {
+        setStatus({ type: 'info', message: 'Dosya seçilmedi.' });
+        return;
+      }
+
+      const data = parseBackupText(file.contents);
+      setPending({
+        name: file.name,
+        data,
+        tasks: data.tasks.length,
+        notes: data.notes.length,
+        ideas: data.ideas.length,
+        focusSessions: data.focusSessions.length,
+      });
     } catch (error) {
-      setStatus({ type: 'error', message: (error as Error).message });
+      setStatus({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Yedek okunamadı.',
+      });
       haptic('light');
     } finally {
-      setIsImporting(false);
+      setBusy(null);
     }
-  }, [importText]);
+  }, []);
 
-  const sectionStyle: ViewStyle = {
-    marginHorizontal: space.lg,
-    marginBottom: space.lg,
-  };
+  const confirmImport = useCallback(async () => {
+    if (!pending) return;
+    setBusy('import');
+    try {
+      importAllData(pending.data);
+      // Tüm sorguları düşür: ekranlar yeni veriyi kendiliğinden okur.
+      queryClient.clear();
+      setPending(null);
+      setLastFile(null);
+      setStatus({
+        type: 'success',
+        message: `Yedek geri yüklendi: ${pending.tasks} görev, ${pending.notes} not, ${pending.ideas} fikir.`,
+      });
+      haptic('success');
+    } catch (error) {
+      setStatus({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Yedek geri yüklenemedi.',
+      });
+      haptic('light');
+    } finally {
+      setBusy(null);
+    }
+  }, [pending, queryClient]);
 
-  const sectionTitleStyle: TextStyle = {
-    fontSize: 16,
-    fontWeight: '600',
-    color: c.text,
-    marginBottom: space.xs,
-  };
-
-  const sectionHintStyle: TextStyle = {
-    fontSize: 13,
-    color: c.textMuted,
-    marginBottom: sp.sm,
-  };
-
-  const actionButtonStyle: ViewStyle = {
-    flexDirection: 'row' as const,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: sp.sm,
-    paddingVertical: space.md,
-    borderRadius: radius.md,
-    minHeight: 48,
-  };
-
-  const actionTextStyle: TextStyle = {
-    color: c.bg,
-    fontWeight: '600',
-    fontSize: 15,
-  };
-
-  const codeBlockStyle: TextStyle = {
+  const card = {
     backgroundColor: c.surface,
-    borderRadius: radius.md,
-    padding: space.md,
-    fontFamily: 'monospace',
-    fontSize: 11,
-    color: c.text,
-    borderWidth: HAIRLINE,
+    borderRadius: radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: c.border,
+    padding: space.md,
+    gap: space.sm,
+    overflow: 'hidden' as const,
   };
 
-  const importInputStyle: TextStyle = {
-    backgroundColor: c.surface,
-    borderColor: c.border,
-    borderWidth: HAIRLINE,
-    borderRadius: radius.md,
-    padding: space.md,
-    color: c.text,
-    fontSize: 13,
-    minHeight: 120,
-    textAlignVertical: 'top' as const,
-  };
-
-  const statusBannerStyle: ViewStyle = {
-    flexDirection: 'row' as const,
-    alignItems: 'center',
-    gap: sp.sm,
-    padding: space.md,
-    borderRadius: radius.md,
-    borderWidth: HAIRLINE,
-  };
+  const runtimeNote = isTauriRuntime()
+    ? 'Masaüstünde kaydetme penceresi açılır; dosyayı istediğin klasöre koyabilirsin.'
+    : 'Tarayıcıda dosya indirilir. İçe aktarma için indirdiğin .json dosyasını seç.';
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -138,121 +193,194 @@ export default function DataScreen() {
 
       <ScrollView
         contentContainerStyle={{
-          paddingHorizontal: sp.lg,
-          paddingTop: sp.md,
-          paddingBottom: sp.xxl,
-          gap: sp.md,
+          paddingHorizontal: space.lg,
+          paddingTop: space.md,
+          paddingBottom: space.xxl,
+          gap: space.md,
         }}
+        showsVerticalScrollIndicator={false}
       >
-        {status && (
+        {status ? (
           <View
-            style={[
-              statusBannerStyle,
-              {
-                backgroundColor: status.type === 'success' ? c.focusSoft : c.accentSoft,
-                borderColor: status.type === 'success' ? c.focus : c.accent,
-              },
-            ]}
             accessibilityRole="alert"
+            style={{
+              flexDirection: 'row',
+              alignItems: 'flex-start',
+              gap: space.xs,
+              padding: space.sm,
+              borderRadius: radius.md,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor:
+                status.type === 'success' ? c.focus : status.type === 'error' ? c.danger : c.border,
+              backgroundColor:
+                status.type === 'success'
+                  ? c.focusSoft
+                  : status.type === 'error'
+                    ? c.accentSoft
+                    : c.surface,
+            }}
           >
-            <Text style={{ color: status.type === 'success' ? c.focus : c.accent, fontSize: 13, fontWeight: '500' }}>
+            <Ionicons
+              name={
+                status.type === 'success'
+                  ? 'checkmark-circle-outline'
+                  : status.type === 'error'
+                    ? 'alert-circle-outline'
+                    : 'information-circle-outline'
+              }
+              size={16}
+              color={
+                status.type === 'success' ? c.focus : status.type === 'error' ? c.danger : c.textMuted
+              }
+              style={{ marginTop: 1 }}
+            />
+            <AppText variant="meta" style={{ flex: 1, color: c.text }}>
               {status.message}
-            </Text>
+            </AppText>
           </View>
-        )}
+        ) : null}
 
-        <View style={sectionStyle}>
-          <Text style={sectionTitleStyle}>JSON Yedeği</Text>
-          <Text style={sectionHintStyle}>Tüm veritabanı, ham JSON formatında.</Text>
-          <Pressable
-            {...pressHandlers}
-            style={[actionButtonStyle, { backgroundColor: c.accent }]}
-            onPress={handleExport}
-            disabled={isExporting}
-            accessible
-            accessibilityLabel="JSON yedeği oluştur"
-          >
-            <Ionicons
-              name={isExporting ? 'reload-circle' : 'download-outline'}
-              size={18}
-              color={c.bg}
+        <View style={card}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="download-outline" size={18} color={c.accent} />
+            <AppText variant="section">Yedek al</AppText>
+          </View>
+          <AppText variant="meta" muted>
+            JSON tüm veriyi taşır ve geri yüklenebilir. Markdown ise okunabilir bir özet:
+            görevler, notlar, fikirler, odak blokları ve günlük planlar.
+          </AppText>
+
+          <View style={{ gap: space.xs, marginTop: space.xxs }}>
+            <Button
+              label="JSON indir"
+              icon="download-outline"
+              loading={busy === 'json'}
+              disabled={busy !== null && busy !== 'json'}
+              onPress={() => void runExport('json')}
             />
-            <Text style={actionTextStyle}>
-              {isExporting ? 'Olu\u015fturuluyor...' : 'JSON Olu\u015ftur'}
-            </Text>
-          </Pressable>
-
-          {Boolean(exportText) && (
-            <View style={{ marginTop: space.sm }}>
-              <TextInput
-                value={exportText}
-                editable={false}
-                multiline
-                numberOfLines={8}
-                style={codeBlockStyle}
+            <Button
+              label="Markdown indir"
+              variant="secondary"
+              icon="document-text-outline"
+              loading={busy === 'markdown'}
+              disabled={busy !== null && busy !== 'markdown'}
+              onPress={() => void runExport('markdown')}
+            />
+            {isTauriRuntime() ? (
+              <Button
+                label="JSON'u panoya kopyala"
+                variant="ghost"
+                icon="copy-outline"
+                disabled={busy !== null}
+                onPress={() => void copyJson()}
               />
+            ) : null}
+          </View>
+
+          {lastFile ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: space.xs,
+                paddingTop: space.xs,
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopColor: c.border,
+              }}
+            >
+              <Ionicons name="checkmark-circle-outline" size={15} color={c.focus} />
+              <AppText variant="meta" faint style={{ flex: 1 }} numberOfLines={1}>
+                {lastFile.name} · {formatBytes(lastFile.bytes)}
+              </AppText>
+            </View>
+          ) : null}
+
+          <AppText variant="meta" faint style={{ fontSize: 11 }}>
+            {runtimeNote}
+          </AppText>
+        </View>
+
+        <View style={card}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="cloud-upload-outline" size={18} color={c.accent} />
+            <AppText variant="section">Yedeği geri yükle</AppText>
+          </View>
+          <AppText variant="meta" muted>
+            Geri yükleme mevcut veriyi siler ve dosyadaki hâliyle değiştirir. Önce dosyayı seç,
+            sonra onayla.
+          </AppText>
+
+          {!pending ? (
+            <Button
+              label={busy === 'import' ? 'Dosya seçiliyor…' : 'JSON dosyası seç'}
+              variant="secondary"
+              icon="folder-open-outline"
+              loading={busy === 'import'}
+              onPress={() => void pickBackup()}
+            />
+          ) : (
+            <View
+              style={{
+                gap: space.sm,
+                padding: space.sm,
+                borderRadius: radius.md,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: c.danger,
+                backgroundColor: c.accentSoft,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
+                <Ionicons name="document-text-outline" size={16} color={c.text} />
+                <AppText variant="bodyStrong" numberOfLines={1} style={{ flex: 1 }}>
+                  {pending.name}
+                </AppText>
+              </View>
+
+              <AppText variant="meta" muted>
+                {pending.tasks} görev · {pending.notes} not · {pending.ideas} fikir ·{' '}
+                {pending.focusSessions} odak bloğu
+              </AppText>
+
+              <AppText variant="meta" style={{ color: c.danger }}>
+                Bu işlem geri alınamaz. Devam etmeden önce mevcut verinin yedeğini alman önerilir.
+              </AppText>
+
+              <View style={{ flexDirection: 'row', gap: space.xs }}>
+                <Button
+                  label="Vazgeç"
+                  variant="secondary"
+                  style={{ flex: 1 }}
+                  disabled={busy === 'import'}
+                  onPress={() => {
+                    setPending(null);
+                    setStatus({ type: 'info', message: 'İçe aktarma iptal edildi.' });
+                  }}
+                />
+                <Button
+                  label="Geri yükle"
+                  variant="danger"
+                  icon="warning-outline"
+                  style={{ flex: 1 }}
+                  loading={busy === 'import'}
+                  onPress={() => void confirmImport()}
+                />
+              </View>
             </View>
           )}
         </View>
 
-        <View style={sectionStyle}>
-          <Text style={sectionTitleStyle}>Markdown Özeti</Text>
-          <Text style={sectionHintStyle}>İnsan okunabilir .md formatında yedek.</Text>
-          <Pressable
-            {...pressHandlers}
-            style={[actionButtonStyle, { backgroundColor: c.surfaceRaised, borderWidth: HAIRLINE, borderColor: c.border }]}
-            onPress={handleExport}
-            disabled={isExporting}
-            accessible
-            accessibilityLabel="Markdown yedeği oluştur"
-          >
-            <Ionicons name={isExporting ? 'reload-circle' : 'document-text-outline'} size={18} color={c.text} />
-            <Text style={actionTextStyle}>Markdown Oluştur</Text>
-          </Pressable>
-
-          {Boolean(markdownText) && (
-            <View style={{ marginTop: space.sm }}>
-              <TextInput
-                value={markdownText}
-                editable={false}
-                multiline
-                numberOfLines={8}
-                style={codeBlockStyle}
-              />
-            </View>
-          )}
-        </View>
-
-        <View style={sectionStyle}>
-          <Text style={sectionTitleStyle}>Veri İçe Aktar</Text>
-          <Text style={sectionHintStyle}>JSON yedeğini buraya yapıştırın ve geri yükleyin.</Text>
-          <TextInput
-            value={importText}
-            onChangeText={setImportText}
-            placeholder="JSON içeriğini buraya yapıştırın..."
-            multiline
-            numberOfLines={6}
-            style={importInputStyle}
-          />
-          <Pressable
-            {...pressHandlers}
-            style={[actionButtonStyle, { backgroundColor: c.focus }]}
-            onPress={handleImport}
-            disabled={isImporting || !importText.trim()}
-            accessible
-            accessibilityLabel="Veriyi içeri aktar"
-          >
-            <Ionicons
-              name={isImporting ? 'reload-circle' : 'cloud-upload-outline'}
-              size={18}
-              color={c.bg}
-            />
-            <Text style={actionTextStyle}>
-              {isImporting ? 'Yükleniyor...' : 'İçe Aktar'}
-            </Text>
-          </Pressable>
-        </View>
+        <AppText variant="meta" faint style={{ paddingHorizontal: space.xxs }}>
+          Yedekler cihazından ayrılmaz; Plot hiçbir dosyayı sunucuya göndermez.
+        </AppText>
       </ScrollView>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+});

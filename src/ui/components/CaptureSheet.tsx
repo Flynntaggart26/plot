@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { BackHandler, Platform, Pressable, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { BackHandler, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, type Href } from 'expo-router';
@@ -14,12 +14,17 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme';
 import { AppText } from './Screen';
+import { Chip } from './Chip';
 import { Sheen } from './Sheen';
 import { usePressScale, useReduceMotion } from '../motion/hooks';
 import { haptic } from '@/lib/haptics';
+import { toast } from '@/lib/toast';
 import { alpha } from '../color';
 import { SHORTCUT_HINTS } from '@/lib/use-shortcuts';
-import { duration, spring, stagger } from '@/ui/tokens';
+import { duration, spring, stagger, fontFaceFor } from '@/ui/tokens';
+import { useCreateTask } from '@/features/tasks/queries';
+import { useCreateNote } from '@/features/notes/queries';
+import { useCreateIdea } from '@/features/ideas/queries';
 
 type CaptureTarget = 'task' | 'note' | 'idea';
 
@@ -153,6 +158,16 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
           <View style={[styles.handle, { backgroundColor: c.borderStrong }]} />
           <View style={{ height: space.md }} />
 
+          <QuickCapture open={open} onClose={onClose} />
+
+          <View style={[styles.divider, { marginVertical: space.sm }]}>
+            <View style={[styles.dividerLine, { backgroundColor: c.border }]} />
+            <AppText variant="meta" faint style={styles.dividerLabel}>
+              TAM FORM
+            </AppText>
+            <View style={[styles.dividerLine, { backgroundColor: c.border }]} />
+          </View>
+
           {TARGETS.map((target, index) => (
             <CaptureOption
               key={target.target}
@@ -187,6 +202,157 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
           ) : null}
         </Animated.View>
       </View>
+    </View>
+  );
+}
+
+const QUICK_PLACEHOLDERS: Record<CaptureTarget, string> = {
+  task: 'Ne yapılacak?',
+  note: 'Aklındaki not…',
+  idea: 'Kıvılcım…',
+};
+
+/**
+ * Sheet'in tepesindeki tek satırlık yakalama.
+ *
+ * Global kısayolun değeri burada: pencereyi öne getir, yaz, Enter'a bas.
+ * Kayıt anında oluşur; tam form yalnızca detay gerektiğinde açılır.
+ */
+function QuickCapture({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { c, space, radius, type } = useTheme();
+  const [text, setText] = useState('');
+  const [target, setTarget] = useState<CaptureTarget>('task');
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
+
+  const createTask = useCreateTask();
+  const createNote = useCreateNote();
+  const createIdea = useCreateIdea();
+  const pending = createTask.isPending || createNote.isPending || createIdea.isPending;
+  const trimmed = text.trim();
+
+  // Masaüstünde sheet açılır açılmaz yazmaya başlanabilsin. Mobilde
+  // kendiliğinden klavye açmak sheet'in yarısını gizler.
+  useEffect(() => {
+    if (!open || Platform.OS !== 'web') return;
+    const timeout = setTimeout(() => inputRef.current?.focus(), 160);
+    return () => clearTimeout(timeout);
+  }, [open]);
+
+  const submit = () => {
+    if (!trimmed || pending) return;
+    setError(null);
+
+    const onSuccess = () => {
+      setText('');
+      haptic('success');
+      toast(
+        target === 'task' ? 'Görev yakalandı' : target === 'note' ? 'Not yakalandı' : 'Fikir yakalandı',
+      );
+      onClose();
+    };
+    const onError = (cause: unknown) => {
+      setError(cause instanceof Error ? cause.message : 'Kaydedilemedi.');
+      haptic('light');
+    };
+
+    if (target === 'task') {
+      createTask.mutate({ title: trimmed }, { onSuccess, onError });
+    } else if (target === 'note') {
+      createNote.mutate({ title: trimmed, folder: 'inbox' }, { onSuccess, onError });
+    } else {
+      createIdea.mutate(
+        { title: trimmed, status: 'spark', source: 'quick-capture' },
+        { onSuccess, onError },
+      );
+    }
+  };
+
+  const activeTarget = TARGETS.find((item) => item.target === target) ?? TARGETS[0];
+
+  return (
+    <View style={{ gap: space.xs }}>
+      <View style={{ flexDirection: 'row', gap: 6 }}>
+        {TARGETS.map((item) => (
+          <Chip
+            key={item.target}
+            label={item.label}
+            selected={target === item.target}
+            onPress={() => {
+              setTarget(item.target);
+              setError(null);
+            }}
+          />
+        ))}
+      </View>
+
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: space.xs,
+          backgroundColor: c.surface,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: error ? c.danger : c.border,
+          borderRadius: radius.pill,
+          paddingLeft: space.md,
+          paddingRight: 5,
+          minHeight: 52,
+        }}
+      >
+        <Ionicons name={activeTarget.icon} size={17} color={c.accent} />
+        <TextInput
+          ref={inputRef}
+          value={text}
+          onChangeText={(next) => {
+            setText(next);
+            if (error) setError(null);
+          }}
+          onSubmitEditing={submit}
+          placeholder={QUICK_PLACEHOLDERS[target]}
+          placeholderTextColor={c.textFaint}
+          selectionColor={c.accent}
+          returnKeyType="done"
+          maxLength={200}
+          accessibilityLabel="Hızlı yakalama"
+          style={[
+            styles.quickInput,
+            {
+              fontFamily: fontFaceFor(type.body),
+              fontSize: type.body.size,
+              color: c.text,
+            },
+          ]}
+        />
+        <Pressable
+          onPress={submit}
+          disabled={!trimmed || pending}
+          accessibilityRole="button"
+          accessibilityLabel="Yakala"
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: radius.pill,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: trimmed ? c.accent : c.surfaceRaised,
+            opacity: pending ? 0.6 : 1,
+            cursor: trimmed ? 'pointer' : 'auto',
+          }}
+        >
+          <Ionicons
+            name={pending ? 'hourglass-outline' : 'arrow-up'}
+            size={18}
+            color={trimmed ? c.bg : c.textFaint}
+          />
+        </Pressable>
+      </View>
+
+      {error ? (
+        <AppText variant="meta" style={{ color: c.danger, paddingHorizontal: space.md }}>
+          {error}
+        </AppText>
+      ) : null}
     </View>
   );
 }
@@ -349,5 +515,23 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  quickInput: {
+    flex: 1,
+    paddingVertical: 0,
+    ...(Platform.OS === 'web' ? { outlineStyle: 'none' as unknown as 'solid' } : null),
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+  },
+  dividerLabel: {
+    fontSize: 10,
+    letterSpacing: 0.9,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -7,22 +7,55 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Screen, ScreenIntro, AppText } from '@/ui/components/Screen';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { Button } from '@/ui/components/Button';
+import { Chip } from '@/ui/components/Chip';
 import { SkeletonList } from '@/ui/components/Skeleton';
 import { useTheme } from '@/ui/theme';
 import { usePressScale, useReduceMotion } from '@/ui/motion/hooks';
 import { haptic } from '@/lib/haptics';
 import { useIdeas } from '@/features/ideas/queries';
-import { IDEA_STATUS_LABELS } from '@/features/ideas/service';
+import { IDEA_STATUS_LABELS, type IdeaStatus } from '@/features/ideas/service';
+import { QuickSpark } from '@/features/ideas/QuickSpark';
 import type { Idea } from '@/db/schema';
+
+type Filter = 'all' | IdeaStatus;
+
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: 'all', label: 'Tümü' },
+  { value: 'spark', label: 'Kıvılcım' },
+  { value: 'saved', label: 'Kaydedildi' },
+  { value: 'committed', label: 'Taahhüt' },
+  { value: 'archived', label: 'Arşiv' },
+];
 
 /**
  * Tangent: yakalanan fikirlerin listesi.
+ *
  * Fikirler kıvılcım olarak doğar; liste onları olgunlaşmaya zorlamaz.
+ * Üstteki tek satırlık alan, form açmadan yakalamayı sağlar.
  */
 export default function TangentScreen() {
   const { c, space } = useTheme();
   const reduced = useReduceMotion();
   const ideas = useIdeas();
+  const [filter, setFilter] = useState<Filter>('all');
+
+  const all = useMemo(() => ideas.data ?? [], [ideas.data]);
+  const counts = useMemo(() => {
+    const next: Record<Filter, number> = {
+      all: all.length,
+      spark: 0,
+      saved: 0,
+      committed: 0,
+      archived: 0,
+    };
+    for (const idea of all) next[idea.status as IdeaStatus] += 1;
+    return next;
+  }, [all]);
+
+  const rows = useMemo(
+    () => (filter === 'all' ? all : all.filter((idea) => idea.status === filter)),
+    [all, filter],
+  );
 
   if (ideas.isPending) {
     return (
@@ -38,7 +71,7 @@ export default function TangentScreen() {
   if (ideas.isError) {
     return (
       <Screen>
-        <ScreenIntro title="Tangent" subtitle="Kafamda döneni buraya dök." />
+        <ScreenIntro title="Tangent" subtitle="Kafanda döneni buraya dök." />
         <EmptyState
           headline="Fikirler okunamadı"
           hint="Uygulamayı yeniden açmayı deneyin; fikirler cihazda duruyor."
@@ -47,20 +80,42 @@ export default function TangentScreen() {
     );
   }
 
-  const rows = ideas.data ?? [];
-
   return (
     <Screen>
       <ScreenIntro
         title="Tangent"
         subtitle={
-          rows.length === 0
-            ? 'Kafamda döneni buraya dök.'
-            : `${rows.length} fikir · hepsi olgunlaşmak zorunda değil`
+          all.length === 0
+            ? 'Kafanda döneni buraya dök.'
+            : `${all.length} fikir — hepsi olgunlaşmak zorunda değil`
         }
       />
 
-      {rows.length === 0 ? (
+      <View style={{ paddingHorizontal: space.lg, paddingTop: space.xs, gap: space.sm }}>
+        <QuickSpark />
+
+        {all.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: space.xs }}
+            accessibilityRole="tablist"
+            accessibilityLabel="Fikir durumuna göre filtrele"
+          >
+            {FILTERS.map((item) => (
+              <Chip
+                key={item.value}
+                label={`${item.label}${counts[item.value] > 0 ? ` · ${counts[item.value]}` : ''}`}
+                selected={filter === item.value}
+                role="button"
+                onPress={() => setFilter(item.value)}
+              />
+            ))}
+          </ScrollView>
+        ) : null}
+      </View>
+
+      {all.length === 0 ? (
         <EmptyState
           icon={<Ionicons name="bulb-outline" size={28} color={c.textFaint} />}
           headline="Henüz fikir yok"
@@ -77,10 +132,20 @@ export default function TangentScreen() {
             />
           }
         />
+      ) : rows.length === 0 ? (
+        <EmptyState
+          icon={<Ionicons name="funnel-outline" size={28} color={c.textFaint} />}
+          headline="Bu durumda fikir yok"
+          hint={`${IDEA_STATUS_LABELS[filter as IdeaStatus]} filtresinde bir şey yok. Filtreyi değiştir ya da yeni bir kıvılcım yakala.`}
+          action={
+            <Button label="Tümünü göster" variant="secondary" onPress={() => setFilter('all')} />
+          }
+        />
       ) : (
         <ScrollView
           contentContainerStyle={{
             paddingHorizontal: space.lg,
+            paddingTop: space.xs,
             paddingBottom: space.xxl,
             gap: space.xs,
           }}
@@ -144,10 +209,7 @@ function IdeaRow({ idea }: { idea: Idea }) {
             overflow: 'hidden',
           }}
         >
-          <View
-            style={[styles.edge, { backgroundColor: c.edge }]}
-            pointerEvents="none"
-          />
+          <View style={[styles.edge, { backgroundColor: c.edge }]} pointerEvents="none" />
 
           <View
             style={{

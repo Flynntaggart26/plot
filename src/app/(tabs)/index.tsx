@@ -68,6 +68,11 @@ export default function TodayScreen() {
                 onPress={() => router.push('/plan')}
               />
               <IntroShortcut
+                icon="stats-chart-outline"
+                label="İstatistikleri aç"
+                onPress={() => router.push('/stats')}
+              />
+              <IntroShortcut
                 icon="settings-outline"
                 label="Ayarları aç"
                 onPress={() => router.push('/settings')}

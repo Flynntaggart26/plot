@@ -7,7 +7,10 @@ import { ThemeProvider, isAppearanceForcedByUrl, setAppearance, useTheme } from 
 import { BootScreen } from '@/ui/components/BootScreen';
 import { StartupError } from '@/ui/components/StartupError';
 import { ToastHost } from '@/ui/components/Toast';
+import { CaptureSheet } from '@/ui/components/CaptureSheet';
 import { useKeyboardShortcuts } from '@/lib/use-shortcuts';
+import { useQuickCapture } from '@/lib/use-quick-capture';
+import { useUIStore } from '@/lib/ui-store';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import * as SplashScreen from 'expo-splash-screen';
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
@@ -82,6 +85,9 @@ function DatabaseGate() {
 function MigratingStack({ database }: { database: AppDatabase }) {
   const { c, dark, fontReady } = useTheme();
   useKeyboardShortcuts();
+  useQuickCapture();
+  const captureOpen = useUIStore((state) => state.captureOpen);
+  const setCaptureOpen = useUIStore((state) => state.setCaptureOpen);
   const migration = useMigrations(database, migrations);
   const seeded = useRef(false);
   const appearanceHydrated = useRef(false);
@@ -149,6 +155,7 @@ function MigratingStack({ database }: { database: AppDatabase }) {
         >
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="plan/index" />
+          <Stack.Screen name="stats" />
           <Stack.Screen name="muse/index" />
           <Stack.Screen name="note/[id]" />
           <Stack.Screen name="note/new" />
@@ -161,6 +168,7 @@ function MigratingStack({ database }: { database: AppDatabase }) {
           <Stack.Screen name="settings/appearance" />
           <Stack.Screen name="settings/data" />
         </Stack>
+        <CaptureSheet open={captureOpen} onClose={() => setCaptureOpen(false)} />
         <ToastHost />
       </Animated.View>
       <StatusBar style={dark ? 'light' : 'dark'} />

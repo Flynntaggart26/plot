@@ -19,17 +19,6 @@ export interface FocusState {
   outerColor: string;      // Çalışma dış halka / segmentler
   breakInnerColor: string; // Mola iç halka (sabit)
   breakOuterColor: string; // Mola dış halka / segmentler (sabit)
-
-  timerId: ReturnType<typeof setInterval> | null;
-}
-
-// Persist edilen ayarlar
-export interface FocusSettings {
-  duration: number;           // dakika
-  totalSessions: number;
-  innerColor: string;
-  outerColor: string;
-  completedWorkSessions: number;
 }
 
 // Veritabanı ayar anahtarları

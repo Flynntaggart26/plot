@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Plot ana pencere yetkileri: çekirdek + dosya seçme/kaydetme",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:default"]
+}
