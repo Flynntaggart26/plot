@@ -63,7 +63,7 @@ export function Select({
               padding: '0 40px 0 14px',
               border: 'none',
               outline: 'none',
-              background: 'transparent',
+              backgroundColor: c.surface,
               color: c.text,
               fontFamily: fontFaceFor(type.body),
               fontSize: type.body.size,
@@ -75,7 +75,16 @@ export function Select({
           }
         >
           {options.map((option) => (
-            <option key={option.value} value={option.value}>
+            <option
+              key={option.value}
+              value={option.value}
+              style={{
+                backgroundColor: c.surface,
+                color: c.text,
+                padding: '8px 12px',
+                fontSize: type.body.size,
+              }}
+            >
               {option.label}
             </option>
           ))}
@@ -152,7 +161,7 @@ export function Select({
             ]}
           >
             <View style={[styles.handle, { backgroundColor: c.borderStrong }]} />
-            <AppText variant="meta" muted style={{ letterSpacing: 1.1, marginTop: space.sm }}>
+            <AppText variant="meta" style={{ color: c.text, letterSpacing: 1.1, marginTop: space.sm }}>
               {(accessibilityLabel ?? placeholder).toLocaleUpperCase('tr-TR')}
             </AppText>
             <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
@@ -172,6 +181,7 @@ export function Select({
                       gap: space.xs,
                       borderBottomWidth: StyleSheet.hairlineWidth,
                       borderBottomColor: c.border,
+                      backgroundColor: active ? c.border : c.surfaceRaised,
                     }}
                   >
                     <AppText

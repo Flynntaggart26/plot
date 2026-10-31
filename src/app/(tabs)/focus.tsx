@@ -273,7 +273,7 @@ export default function FocusScreen() {
                 cursor: 'pointer',
               }}
             >
-              <Ionicons name="options-outline" size={18} color={c.textMuted} />
+              <Ionicons name="settings-outline" size={18} color={c.textMuted} />
               <View style={{ flex: 1, gap: 1 }}>
                 <AppText variant="bodyStrong">Ayarlar</AppText>
                 <AppText variant="meta" faint>
