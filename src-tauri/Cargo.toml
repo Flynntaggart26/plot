@@ -1,6 +1,6 @@
 [package]
 name = "plot"
-version = "0.7.2"
+version = "0.7.3"
 description = "ADHD dostu günlük planlama"
 authors = ["Egehan"]
 edition = "2021"
@@ -13,6 +13,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-global-shortcut = "2"
+tauri-plugin-updater = "2"
 
 [profile.release]
 codegen-units = 1

@@ -2,7 +2,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use tauri::{Emitter, Manager};
+use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_global_shortcut::ShortcutState;
+use tauri_plugin_updater::UpdaterExt;
 
 /// Kullanıcının seçtiği yola metin yazar (dışa aktarma).
 ///
@@ -19,9 +21,51 @@ fn read_text_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|error| error.to_string())
 }
 
+/// GitHub releases'dan yeni sürüm denetler. Güncelleme varsa arayüze bildirir.
+#[tauri::command]
+async fn check_for_update(app: tauri::AppHandle) -> Result<bool, String> {
+    let update = app.updater().check().await.map_err(|error| error.to_string())?;
+    if let Some(update) = update {
+        let _ = app.emit(
+            "plot:update-available",
+            serde_json::json!({
+                "version": update.version,
+                "download_url": update.manifest.url,
+                "notes": update.body
+            }),
+        );
+        return Ok(true);
+    }
+    Ok(false)
+}
+
+/// Mevcut güncellemeyi indirir ve kurar. Kullanıcı onayı istenir; kurulum
+/// sonrası uygulama yeniden başlatılır ve veriler (SQLite) silinmez.
+#[tauri::command]
+async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
+    let update = app.updater().check().await.map_err(|error| error.to_string())?;
+    let Some(update) = update else {
+        return Err("Güncelleme bulunamadı.".to_string());
+    };
+
+    update
+        .download_and_install(|event| {
+            if let tauri_plugin_updater::UpdateEvent::DownloadedProgress { .. } = event {
+                // İlerleme durumunu arayüze göndermek istenirse buraya eklenebilir.
+            }
+        })
+        .await
+        .map_err(|error| error.to_string())?;
+
+    // Kurulum tamamlandıktan sonra uygulamayı yeniden başlat.
+    let _ = app.restart();
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_shortcut("Ctrl+Shift+Space")
@@ -42,7 +86,12 @@ fn main() {
                 })
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![write_text_file, read_text_file])
+        .invoke_handler(tauri::generate_handler![
+            write_text_file,
+            read_text_file,
+            check_for_update,
+            install_update
+        ])
         .run(tauri::generate_context!())
         .expect("Plot açılırken hata oluştu");
 }
