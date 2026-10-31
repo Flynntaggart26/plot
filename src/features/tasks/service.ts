@@ -291,9 +291,10 @@ export async function deleteTask(id: string): Promise<void> {
   // Ses kaydı dosyasını sil (Feature 6 – Voice-to-Task).
   if (current.audioPath) {
     try {
-      // expo-file-system dinamik import: web'de yoksa sessizce atlanır.
-      const { FileSystem } = (await import('expo-file-system')) as any;
-      await FileSystem.deleteAsync(current.audioPath, { idempotent: true }).catch(() => {});
+      // expo-file-system/legacy: v58'de `deleteAsync` yalnızca bu girişten
+      // yayınlanır; ana modülde yoktur.
+      const { deleteAsync } = await import('expo-file-system/legacy');
+      await deleteAsync(current.audioPath, { idempotent: true }).catch(() => {});
     } catch {
       // Dosya silme hatası görev silmeyi engellemez.
     }

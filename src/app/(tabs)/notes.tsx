@@ -61,8 +61,8 @@ export default function NotesScreen() {
         <ScreenIntro title="Notlar" subtitle="0 not · [[Başlık]] ile bağlantı kurabilirsiniz" />
         <EmptyState
           icon={<Ionicons name="document-text-outline" size={28} color={c.textFaint} />}
-          headline="Not yok"
-          hint="İlk notunuzu oluşturun. İkincisi geldiğinde [[bağlantı]] kurmaya başlayabilirsiniz."
+          headline="Henüz not yok"
+          hint="İlk notunu yaz. İkincisi geldiğinde [[bağlantı]] kurmaya başlayabilirsin."
           action={
             <Button
               label="İlk notu yaz"
@@ -74,14 +74,6 @@ export default function NotesScreen() {
               }}
             />
           }
-        />
-        <Button
-          label="Yeni Not"
-          icon="create-outline"
-          onPress={() => {
-            haptic('medium');
-            router.push('/note/new');
-          }}
         />
       </Screen>
     );
@@ -175,15 +167,6 @@ export default function NotesScreen() {
           ))}
         </ScrollView>
       )}
-
-      <Button
-        label="Yeni Not"
-        icon="create-outline"
-        onPress={() => {
-          haptic('medium');
-          router.push('/note/new');
-        }}
-      />
     </Screen>
   );
 }

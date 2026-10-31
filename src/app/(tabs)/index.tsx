@@ -126,6 +126,17 @@ export default function TodayScreen() {
             <QuietHint
               headline="Günün üç şeyi henüz seçilmedi."
               hint="En çok fark yaratacak üç işi buraya al."
+              action={
+                <Button
+                  label="Must-do seç"
+                  variant="secondary"
+                  icon="add-circle-outline"
+                  onPress={() => {
+                    haptic('medium');
+                    router.push({ pathname: '/task/new', params: { mustDo: '1' } });
+                  }}
+                />
+              }
             />
           )}
         </SectionCard>
@@ -294,7 +305,16 @@ function TaskList({
   );
 }
 
-function QuietHint({ headline, hint }: { headline: string; hint: string }) {
+function QuietHint({
+  headline,
+  hint,
+  action,
+}: {
+  headline: string;
+  hint: string;
+  /** Boş durumda ilk adımı doğrudan vermek için. */
+  action?: React.ReactNode;
+}) {
   const { space } = useTheme();
   return (
     <View style={{ paddingVertical: space.lg, gap: space.xxs }}>
@@ -304,6 +324,7 @@ function QuietHint({ headline, hint }: { headline: string; hint: string }) {
       <AppText variant="meta" faint>
         {hint}
       </AppText>
+      {action ? <View style={{ marginTop: space.xs, alignSelf: 'flex-start' }}>{action}</View> : null}
     </View>
   );
 }

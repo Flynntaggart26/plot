@@ -17,6 +17,8 @@ interface RingSVGProps {
   outerColor: string;      // Çalışma dış
   breakInnerColor: string; // Mola iç
   breakOuterColor: string; // Mola dış
+  /** Görüntü boyutu; küçük ekranlarda küçültülür, geometri viewBox ile ölçeklenir. */
+  size?: number;
 }
 
 export function RingSVG({
@@ -30,6 +32,7 @@ export function RingSVG({
   outerColor,
   breakInnerColor,
   breakOuterColor,
+  size = FOCUS_RING_CONSTANTS.SVG_SIZE,
 }: RingSVGProps) {
   const { c } = useTheme();
   const { SVG_SIZE, CENTER, R_INNER, R_OUTER, W_INNER, W_OUTER, DASH_INNER } = FOCUS_RING_CONSTANTS;
@@ -45,7 +48,12 @@ export function RingSVG({
     })), [totalSessions]);
 
   return (
-    <Svg width={SVG_SIZE} height={SVG_SIZE} style={{ transform: [{ rotate: '-90deg' }] }}>
+    <Svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE}`}
+      style={{ transform: [{ rotate: '-90deg' }] }}
+    >
       {/* Dış segmentler */}
       <G>
         {segmentPaths.map(({ bgPath, fgPath }, i) => {

@@ -234,7 +234,7 @@ export default function MuseScreen() {
                   isUser ? userBubbleStyle : aiBubbleStyle,
                 ]}
               >
-                <Text style={[bubbleTextStyle, { color: c.text }]}>
+                <Text style={[bubbleTextStyle, { color: isUser ? c.bg : c.text }]}>
                   {msg.content}
                 </Text>
               </View>
@@ -253,6 +253,46 @@ export default function MuseScreen() {
             <Text style={{ color: c.textMuted, fontSize: 13 }}>Yükleniyor...</Text>
           </View>
         )}
+
+        {!messagesLoading && (messages ?? []).length === 0 ? (
+          <View
+            style={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingVertical: sp.xxl,
+              gap: sp.xs,
+            }}
+          >
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: c.surfaceRaised,
+                borderWidth: HAIRLINE,
+                borderColor: c.border,
+              }}
+            >
+              <Ionicons name="sparkles-outline" size={22} color={c.accent} />
+            </View>
+            <Text style={{ color: c.text, fontSize: 15, fontWeight: '600' }}>
+              {activeThreadId ? 'Sohbet boş' : 'Yeni bir sohbet'}
+            </Text>
+            <Text
+              style={{
+                color: c.textMuted,
+                fontSize: 13,
+                textAlign: 'center',
+                maxWidth: 320,
+                lineHeight: 19,
+              }}
+            >
+              İlk mesajını yaz. Sohbet geçmişi yalnızca bu cihazda saklanır.
+            </Text>
+          </View>
+        ) : null}
       </ScrollView>
 
       <View style={inputContainerStyle}>

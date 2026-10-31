@@ -1,6 +1,14 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioPlayer,
+  useAudioPlayerStatus,
+  useAudioRecorder,
+} from 'expo-audio';
 import { useTheme } from '@/ui/theme';
 import { fontFaceFor } from '@/ui/tokens';
 import { AppText } from '@/ui/components/Screen';
@@ -11,15 +19,28 @@ import { getDb } from '@/db/client';
 import { ideas } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
+/** Kayıt üst sınırı. Kısa tutulur: buradaki ses bir not değil, bir hatırlatıcı. */
+const MAX_RECORD_MS = 10_000;
+
+/**
+ * Kayıt, uygulamanın belge dizinine yazılır. Önbellek dizini sistem baskı
+ * altında silinebilir; kullanıcı fikrini haftalar sonra açtığında sesin
+ * yerinde olması gerekir.
+ */
+const RECORDING_OPTIONS = {
+  ...RecordingPresets.HIGH_QUALITY,
+  directory: 'document' as const,
+};
+
 /**
  * Tangent ekranının tepesindeki tek satırlık kıvılcım alanı.
  *
  * Fikri kaydetmek için form açmak gerekmez: yaz, Enter'a bas. Fikir her
  * zaman `spark` olarak doğar; olgunlaştırmak kullanıcının sonraki kararıdır.
  *
- * Feature 6 – Voice-to-Task: Mikrofon simgesi ile en fazla 10 saniyelik
- * ses kaydı yapılır; kayıt yerelde .mp3 olarak saklanır ve fikirle
- * ilişkilendirilir.
+ * Voice-to-Task: mikrofon en fazla 10 saniye kaydeder. Kayıt bitince
+ * dosyanın gerçek yolu (`recorder.uri`) fikre bağlanır; oynatma aynı
+ * dosyadan yapılır, böylece kaydettiğini duymadan kaydetmiş olmazsın.
  */
 export function QuickSpark() {
   const { c, space, radius, type } = useTheme();
@@ -30,13 +51,98 @@ export function QuickSpark() {
   const [audioError, setAudioError] = useState<string | null>(null);
   const create = useCreateIdea();
   const trimmed = title.trim();
-  const recordingRef = useRef<{
-    stop: () => Promise<void>;
-    uri: string;
-  } | null>(null);
+
+  const recorder = useAudioRecorder(RECORDING_OPTIONS);
+  const player = useAudioPlayer(audioUri);
+  const playback = useAudioPlayerStatus(player);
+  const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Ekrandan çıkarken zamanlayıcı ve oynatıcı arkada kalmasın.
+  useEffect(() => {
+    return () => {
+      if (stopTimer.current) clearTimeout(stopTimer.current);
+    };
+  }, []);
+
+  const resetAudio = () => {
+    if (playback.playing) player.pause();
+    setAudioUri(null);
+    setAudioError(null);
+  };
+
+  const finishRecording = async () => {
+    if (stopTimer.current) {
+      clearTimeout(stopTimer.current);
+      stopTimer.current = null;
+    }
+    setRecording(false);
+
+    try {
+      await recorder.stop();
+    } catch {
+      // Durdurma hatası kaydı geçersiz kılmaz; dosya yine de yazılmış olabilir.
+    }
+
+    const uri = recorder.uri;
+    if (uri) {
+      setAudioUri(uri);
+      haptic('success');
+    } else {
+      setAudioError('Kayıt alınamadı. Mikrofon iznini kontrol et.');
+      haptic('light');
+    }
+  };
+
+  const startRecording = async () => {
+    setAudioError(null);
+    setError(null);
+
+    try {
+      const permission = await requestRecordingPermissionsAsync();
+      if (!permission.granted) {
+        setAudioError('Mikrofon izni verilmedi.');
+        return;
+      }
+
+      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+
+      resetAudio();
+      setRecording(true);
+      haptic('medium');
+      stopTimer.current = setTimeout(() => {
+        void finishRecording();
+      }, MAX_RECORD_MS);
+    } catch {
+      setRecording(false);
+      setAudioError('Ses kaydı başlatılamadı. Bu cihazda mikrofon kullanılamıyor olabilir.');
+    }
+  };
+
+  const togglePlayback = async () => {
+    if (!audioUri) return;
+
+    try {
+      if (playback.playing) {
+        player.pause();
+        return;
+      }
+
+      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
+      // Bitmiş bir kaydı tekrar dinlemek için başa sar; yoksa sessiz kalır.
+      if (playback.didJustFinish || playback.currentTime > 0) {
+        await player.seekTo(0);
+      }
+      player.play();
+      haptic('light');
+    } catch {
+      setAudioError('Kayıt oynatılamadı.');
+    }
+  };
 
   const submit = () => {
-    if (!trimmed || create.isPending) return;
+    if (!trimmed || create.isPending || recording) return;
     setError(null);
 
     create.mutate(
@@ -47,7 +153,7 @@ export function QuickSpark() {
       },
       {
         onSuccess: (idea) => {
-          // Kayitli ses varsa fikir kaydına bagla
+          // Kayıtlı ses varsa fikir kaydına bağla.
           if (audioUri) {
             try {
               const db = getDb();
@@ -56,11 +162,11 @@ export function QuickSpark() {
                 .where(eq(ideas.id, idea.id))
                 .run();
             } catch {
-              // Ses baglantisi basarisiz olsa fikir kaydedilmis olur.
+              // Ses bağlantısı başarısız olsa fikir kaydedilmiş olur.
             }
           }
           setTitle('');
-          setAudioUri(null);
+          resetAudio();
           haptic('success');
           toast('Kıvılcım yakalandı');
         },
@@ -72,58 +178,7 @@ export function QuickSpark() {
     );
   };
 
-  const toggleRecording = async () => {
-    if (recording) {
-      if (recordingRef.current) {
-        try {
-          await recordingRef.current.stop();
-        } catch {
-          setAudioError('Ses kaydı durdurulamadı.');
-        }
-        recordingRef.current = null;
-      }
-      setRecording(false);
-    } else {
-      try {
-        // expo-av dinamik import: web/Tauri masaüstünde AV yoksa sessizce geri dönülür.
-        const { Audio } = (await import('expo-av')) as any;
-        const { FileSystem } = (await import('expo-file-system')) as any;
-
-        await Audio.requestPermissionsAsync();
-        const recorder = new Audio.Recording();
-        await recorder.prepareToRecordAsync(Audio.RECORDING_PRESET_HIGH_QUALITY);
-        await recorder.startAsync();
-
-        const fileUri = `${FileSystem.cacheDirectory}voice_${Date.now()}.mp3`;
-
-        // 10 saniye sonra otomatik durdur
-        const timer = setTimeout(async () => {
-          try {
-            await (recorder as any).stop();
-            setAudioUri(fileUri);
-            setRecording(false);
-            recordingRef.current = null;
-          } catch {
-            setRecording(false);
-            recordingRef.current = null;
-          }
-        }, 10000);
-
-        recordingRef.current = {
-          stop: async () => {
-            clearTimeout(timer);
-            await (recorder as any).stop();
-            setRecording(false);
-            recordingRef.current = null;
-          },
-          uri: fileUri,
-        };
-        setRecording(true);
-      } catch {
-        setAudioError('Ses kaydı desteklenmiyor.');
-      }
-    }
-  };
+  const canSubmit = trimmed.length > 0 && !create.isPending && !recording;
 
   return (
     <View style={{ gap: space.xxs }}>
@@ -134,14 +189,18 @@ export function QuickSpark() {
           gap: space.xs,
           backgroundColor: c.surface,
           borderWidth: StyleSheet.hairlineWidth,
-          borderColor: error ? c.danger : c.border,
+          borderColor: error ? c.danger : recording ? c.danger : c.border,
           borderRadius: radius.pill,
           paddingLeft: space.md,
           paddingRight: 5,
           minHeight: 52,
         }}
       >
-        <Ionicons name="bulb-outline" size={17} color={c.accent} />
+        <Ionicons
+          name={recording ? 'mic' : 'bulb-outline'}
+          size={17}
+          color={recording ? c.danger : c.accent}
+        />
         <TextInput
           value={title}
           onChangeText={(text) => {
@@ -149,11 +208,12 @@ export function QuickSpark() {
             if (error) setError(null);
           }}
           onSubmitEditing={submit}
-          placeholder="Aklına geleni yakala…"
+          placeholder={recording ? 'Kayıt sürüyor…' : 'Aklına geleni yakala…'}
           placeholderTextColor={c.textFaint}
           selectionColor={c.accent}
           returnKeyType="done"
           maxLength={160}
+          editable={!recording}
           accessibilityLabel="Hızlı fikir"
           style={[
             styles.input,
@@ -164,11 +224,16 @@ export function QuickSpark() {
             },
           ]}
         />
+
         <Pressable
-          onPress={toggleRecording}
+          onPress={() => {
+            if (recording) void finishRecording();
+            else void startRecording();
+          }}
           disabled={create.isPending}
           accessibilityRole="button"
           accessibilityLabel={recording ? 'Kaydı durdur' : 'Ses kaydı başlat'}
+          accessibilityState={{ busy: recording }}
           style={{
             width: 40,
             height: 40,
@@ -181,14 +246,15 @@ export function QuickSpark() {
           }}
         >
           <Ionicons
-            name={recording ? 'stop' : 'mic'}
+            name={recording ? 'stop' : 'mic-outline'}
             size={18}
-            color={recording ? c.bg : c.textFaint}
+            color={recording ? '#FFFFFF' : c.textMuted}
           />
         </Pressable>
+
         <Pressable
           onPress={submit}
-          disabled={!trimmed || create.isPending}
+          disabled={!canSubmit}
           accessibilityRole="button"
           accessibilityLabel="Fikri kaydet"
           style={{
@@ -197,53 +263,71 @@ export function QuickSpark() {
             borderRadius: radius.pill,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: trimmed ? c.accent : c.surfaceRaised,
+            backgroundColor: canSubmit ? c.accent : c.surfaceRaised,
             opacity: create.isPending ? 0.6 : 1,
-            cursor: trimmed ? 'pointer' : 'auto',
+            cursor: canSubmit ? 'pointer' : 'auto',
           }}
         >
           <Ionicons
             name={create.isPending ? 'hourglass-outline' : 'arrow-up'}
             size={18}
-            color={trimmed ? c.bg : c.textFaint}
+            color={canSubmit ? c.bg : c.textFaint}
           />
         </Pressable>
       </View>
 
-      {audioUri ? (
+      {recording ? (
+        <View
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: space.md }}
+          accessibilityRole="alert"
+        >
+          <View style={[styles.liveDot, { backgroundColor: c.danger }]} />
+          <AppText variant="meta" style={{ color: c.danger }}>
+            Kaydediliyor · en fazla 10 sn
+          </AppText>
+        </View>
+      ) : null}
+
+      {audioUri && !recording ? (
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
             gap: space.xs,
-            paddingHorizontal: space.md,
-            marginTop: space.xs,
+            paddingLeft: space.md,
+            paddingRight: space.xxs,
+            marginTop: space.xxs,
             backgroundColor: c.surfaceRaised,
             borderWidth: StyleSheet.hairlineWidth,
             borderColor: c.border,
             borderRadius: radius.pill,
+            minHeight: 40,
           }}
         >
-          <Ionicons name="musical-notes" size={16} color={c.accent} />
-          <AppText variant="meta" muted>
-            Ses kaydı hazır
+          <Ionicons name="musical-notes-outline" size={16} color={c.accent} />
+          <AppText variant="meta" muted style={{ flex: 1 }} numberOfLines={1}>
+            {playback.playing ? 'Dinleniyor…' : 'Ses kaydı hazır'}
           </AppText>
           <Pressable
-            onPress={() => {
-              haptic('light');
-            }}
-            accessibilityLabel="Ses kaydını dinle"
-            style={{ padding: 4 }}
+            onPress={() => void togglePlayback()}
+            accessibilityRole="button"
+            accessibilityLabel={playback.playing ? 'Kaydı duraklat' : 'Ses kaydını dinle'}
+            style={styles.iconButton}
           >
-            <Ionicons name="play-outline" size={16} color={c.accent} />
+            <Ionicons
+              name={playback.playing ? 'pause' : 'play'}
+              size={16}
+              color={c.accent}
+            />
           </Pressable>
           <Pressable
             onPress={() => {
-              setAudioUri(null);
+              resetAudio();
               haptic('light');
             }}
+            accessibilityRole="button"
             accessibilityLabel="Kaydı sil"
-            style={{ padding: 4 }}
+            style={styles.iconButton}
           >
             <Ionicons name="trash-outline" size={16} color={c.danger} />
           </Pressable>
@@ -274,5 +358,17 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 0,
     ...(Platform.OS === 'web' ? { outlineStyle: 'none' as unknown as 'solid' } : null),
+  },
+  iconButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+  },
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
   },
 });

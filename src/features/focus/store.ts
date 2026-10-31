@@ -38,7 +38,11 @@ function resetBreakReminderTimer(): void {
   }
 }
 
-function startBreakReminderMonitor(get: () => { isRunning: boolean; breakReminderEnabled: boolean }): void {
+function startBreakReminderMonitor(get: () => {
+  isRunning: boolean;
+  breakReminderEnabled: boolean;
+  setBreakReminderTriggered: (triggered: boolean) => void;
+}): void {
   resetBreakReminderTimer();
   if (!get().breakReminderEnabled || !get().isRunning) return;
 
@@ -47,9 +51,7 @@ function startBreakReminderMonitor(get: () => { isRunning: boolean; breakReminde
     if (state.breakReminderEnabled && state.isRunning) {
       const idle = Date.now() - lastActivityAt;
       if (idle >= BREAK_REMINDER_IDLE_MS) {
-        // UI tarafindan okulur: store'da isaretle
-        const store = get as any;
-        if (store.setBreakReminderTriggered) store.setBreakReminderTriggered(true);
+        state.setBreakReminderTriggered(true);
       }
     }
   }, BREAK_REMINDER_IDLE_MS - (Date.now() - lastActivityAt));
@@ -366,6 +368,7 @@ export const useFocusStore = create<FocusState & FocusActions>()(
         completedWorkSessions: state.completedWorkSessions,
         innerColor: state.innerColor,
         outerColor: state.outerColor,
+        breakReminderEnabled: state.breakReminderEnabled,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {

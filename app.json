@@ -30,6 +30,12 @@
       "expo-sqlite",
       "expo-font",
       [
+        "expo-audio",
+        {
+          "microphonePermission": "Plot, sesli fikir kaydı için mikrofonunu kullanır."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#0E0E10",

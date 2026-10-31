@@ -60,7 +60,7 @@ export default function TangentScreen() {
   if (ideas.isPending) {
     return (
       <Screen>
-        <ScreenIntro title="Tangent" subtitle="Fikirler yükleniyor..." />
+        <ScreenIntro title="Fikirler" subtitle="Fikirler yükleniyor..." />
         <View style={{ paddingHorizontal: space.lg, paddingTop: space.xs }}>
           <SkeletonList rows={4} />
         </View>
@@ -71,7 +71,7 @@ export default function TangentScreen() {
   if (ideas.isError) {
     return (
       <Screen>
-        <ScreenIntro title="Tangent" subtitle="Kafanda döneni buraya dök." />
+        <ScreenIntro title="Fikirler" subtitle="Kafanda döneni buraya dök." />
         <EmptyState
           headline="Fikirler okunamadı"
           hint="Uygulamayı yeniden açmayı deneyin; fikirler cihazda duruyor."
@@ -83,7 +83,7 @@ export default function TangentScreen() {
   return (
     <Screen>
       <ScreenIntro
-        title="Tangent"
+        title="Fikirler"
         subtitle={
           all.length === 0
             ? 'Kafanda döneni buraya dök.'
@@ -119,18 +119,7 @@ export default function TangentScreen() {
         <EmptyState
           icon={<Ionicons name="bulb-outline" size={28} color={c.textFaint} />}
           headline="Henüz fikir yok"
-          hint="Aklına geleni yakala; sonra bakarsın. Kıvılcım olarak kalmak da yeter."
-          action={
-            <Button
-              label="Fikir yakala"
-              variant="secondary"
-              icon="bulb-outline"
-              onPress={() => {
-                haptic('medium');
-                router.push('/tangent/new');
-              }}
-            />
-          }
+          hint="Yukarıdaki alana yazıp Enter'a bas. Kıvılcım olarak kalmak da yeter."
         />
       ) : rows.length === 0 ? (
         <EmptyState
@@ -162,15 +151,6 @@ export default function TangentScreen() {
           ))}
         </ScrollView>
       )}
-
-      <Button
-        label="Yeni Fikir"
-        icon="bulb-outline"
-        onPress={() => {
-          haptic('medium');
-          router.push('/tangent/new');
-        }}
-      />
     </Screen>
   );
 }

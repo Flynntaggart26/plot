@@ -1,7 +1,15 @@
-import React from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { useTheme } from '@/ui/theme';
+import { useReduceMotion } from '@/ui/motion/hooks';
 
 interface SessionDotsProps {
   totalSessions: number;
@@ -12,31 +20,11 @@ interface SessionDotsProps {
   breakOuterColor: string;
 }
 
-interface SessionDotProps {
-  isCompleted: boolean;
-  isCurrent: boolean;
-  pulse: ReturnType<typeof useSharedValue<number>>;
-  outerColor: string;
-  activeColor: string;
-  borderColor: string;
-  c: ReturnType<typeof useTheme>['c'];
-}
-
-function SessionDot({ isCompleted, isCurrent, pulse, outerColor, activeColor, borderColor, c }: SessionDotProps) {
-  const bgColor = isCompleted ? outerColor : 'transparent';
-  const bColor = isCompleted ? outerColor : borderColor;
-  
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulse.value }],
-    backgroundColor: bgColor,
-    borderColor: bColor,
-  }), [isCompleted, borderColor, outerColor, bgColor, bColor]);
-
-  return (
-    <Animated.View style={[styles.dot, animatedStyle]} />
-  );
-}
-
+/**
+ * Oturum göstergesi: dolu = bitmiş, nabız atan = şu anki, boş = sırada.
+ * Yalnızca güncel nokta büyür; hepsinin oynaması hangi oturumda olduğunu
+ * bulanıklaştırırdı.
+ */
 export function SessionDots({
   totalSessions,
   completedWorkSessions,
@@ -46,49 +34,86 @@ export function SessionDots({
   breakOuterColor,
 }: SessionDotsProps) {
   const { c } = useTheme();
+  const reduced = useReduceMotion();
   const isWork = mode === 'work';
   const activeColor = isWork ? outerColor : breakOuterColor;
-
-  // Pulse animation for current dot
   const pulse = useSharedValue(1);
-  React.useEffect(() => {
-    if (isRunning && isWork) {
-      pulse.value = withTiming(1.15, { duration: 750, easing: Easing.inOut(Easing.ease) }, () => {
-        pulse.value = withTiming(1, { duration: 750, easing: Easing.inOut(Easing.ease) });
-      });
-    }
-  }, [isRunning, isWork, pulse]);
 
-  const dots = React.useMemo(() => 
-    Array.from({ length: totalSessions }, (_, i) => {
-      const isCompleted = i < completedWorkSessions;
-      const isCurrent = i === completedWorkSessions && isRunning && isWork;
-      
-      return { isCompleted, isCurrent };
-    }), [totalSessions, completedWorkSessions, isRunning, isWork]);
+  useEffect(() => {
+    if (reduced) {
+      pulse.set(1);
+      return;
+    }
+    if (isRunning && isWork) {
+      pulse.set(
+        withRepeat(
+          withSequence(
+            withTiming(1.22, { duration: 750, easing: Easing.inOut(Easing.ease) }),
+            withTiming(1, { duration: 750, easing: Easing.inOut(Easing.ease) }),
+          ),
+          -1,
+        ),
+      );
+      return;
+    }
+    pulse.set(withTiming(1, { duration: 160 }));
+  }, [isRunning, isWork, pulse, reduced]);
+
+  const dots = useMemo(
+    () =>
+      Array.from({ length: totalSessions }, (_, index) => ({
+        isCompleted: index < completedWorkSessions,
+        isCurrent: index === completedWorkSessions && isRunning,
+      })),
+    [totalSessions, completedWorkSessions, isRunning],
+  );
 
   return (
-    <View style={styles.container}>
-      {dots.map(({ isCompleted, isCurrent }, i) => (
-        <SessionDot
-          key={i}
-          isCompleted={isCompleted}
-          isCurrent={isCurrent}
+    <View
+      style={styles.container}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={`${completedWorkSessions} / ${totalSessions} oturum tamamlandı`}
+    >
+      {dots.map((dot, index) => (
+        <Dot
+          key={index}
+          completed={dot.isCompleted}
+          current={dot.isCurrent}
           pulse={pulse}
-          outerColor={outerColor}
-          activeColor={activeColor}
-          borderColor={isCompleted ? outerColor : (isCurrent ? activeColor : c.border)}
-          c={c}
+          color={dot.isCompleted ? outerColor : dot.isCurrent ? activeColor : c.border}
         />
       ))}
     </View>
   );
 }
 
+function Dot({
+  completed,
+  current,
+  pulse,
+  color,
+}: {
+  completed: boolean;
+  current: boolean;
+  pulse: ReturnType<typeof useSharedValue<number>>;
+  color: string;
+}) {
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: current ? pulse.get() : 1 }],
+    backgroundColor: completed ? color : 'transparent',
+    borderColor: color,
+  }));
+
+  return <Animated.View style={[styles.dot, animatedStyle]} />;
+}
+
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     gap: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dot: {
     width: 8,

@@ -1,52 +1,113 @@
-import React from 'react';
-import { Pressable, View, StyleSheet, Text } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
+import React, { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { useTheme } from '@/ui/theme';
+import { AppText } from '@/ui/components/Screen';
+import { haptic } from '@/lib/haptics';
+import { alpha } from '@/ui/color';
+import { spring } from '@/ui/tokens';
 
-interface ModeToggleProps {
+/**
+ * Çalışma / Mola seçici.
+ *
+ * Gösterge, seçili modun rengiyle yumuşak bir zemin olarak kayar; metin
+ * rengi de aynı rengi alır. Emoji yok: ikonlar cihazlar arasında aynı
+ * çizilir ve ekran okuyucu "ateş" demez.
+ */
+export function ModeToggle({
+  mode,
+  onChange,
+  workColor,
+  breakColor,
+}: {
   mode: 'work' | 'break';
   onChange: (mode: 'work' | 'break') => void;
   workColor: string;
   breakColor: string;
-}
+}) {
+  const { c, radius } = useTheme();
+  const [width, setWidth] = useState(0);
+  const progress = useSharedValue(mode === 'work' ? 0 : 1);
 
-export function ModeToggle({ mode, onChange, workColor, breakColor }: ModeToggleProps) {
-  useTheme(); // for theme context
-  
-  const activeMode = useSharedValue(mode === 'work' ? 0 : 1);
-  
-  React.useEffect(() => {
-    activeMode.value = mode === 'work' ? 0 : 1;
-  }, [mode, activeMode]);
+  useEffect(() => {
+    progress.set(withSpring(mode === 'work' ? 0 : 1, spring.snappy));
+  }, [mode, progress]);
 
-  const indicatorStyle = useAnimatedStyle(() => {
-    const translateX = activeMode.value === 0 ? 4 : 4 + 100; // 4 padding + ~100 button width
-    return {
-      transform: [{ translateX }],
-    };
-  });
+  const segmentWidth = width > 0 ? (width - 8) / 2 : 0;
+
+  const indicatorStyle = useAnimatedStyle(() => ({
+    width: segmentWidth,
+    transform: [{ translateX: progress.get() * segmentWidth }],
+  }));
+
+  const activeColor = mode === 'work' ? workColor : breakColor;
+
+  const option = (target: 'work' | 'break', label: string, icon: keyof typeof Ionicons.glyphMap) => {
+    const active = mode === target;
+    return (
+      <Pressable
+        onPress={() => {
+          if (active) return;
+          haptic('tick');
+          onChange(target);
+        }}
+        accessibilityRole="radio"
+        aria-checked={active}
+        accessibilityLabel={label}
+        style={[styles.option, { cursor: 'pointer' }]}
+      >
+        <Ionicons
+          name={icon}
+          size={15}
+          color={active ? activeColor : c.textFaint}
+        />
+        <AppText
+          variant="meta"
+          style={{
+            color: active ? activeColor : c.textMuted,
+            fontWeight: active ? '600' : '500',
+          }}
+        >
+          {label}
+        </AppText>
+      </Pressable>
+    );
+  };
 
   return (
-    <View style={styles.container}>
-      <Animated.View style={[styles.indicator, indicatorStyle]} />
-      <Pressable
-        style={({ pressed }) => [styles.btn, pressed && styles.btnPressed, mode === 'work' && styles.activeWork, mode === 'break' && styles.activeBreak]}
-        onPress={() => onChange('work')}
-        accessibilityRole="radio"
-        aria-checked={mode === 'work'}
-        android_ripple={{ color: `${workColor}33` }}
-      >
-        <Text style={[styles.btnText, mode === 'work' && styles.activeText]}>🔥 Çalışma</Text>
-      </Pressable>
-      <Pressable
-        style={({ pressed }) => [styles.btn, pressed && styles.btnPressed, mode === 'break' && styles.activeBreak]}
-        onPress={() => onChange('break')}
-        accessibilityRole="radio"
-        aria-checked={mode === 'break'}
-        android_ripple={{ color: `${breakColor}33` }}
-      >
-        <Text style={[styles.btnText, mode === 'break' && styles.activeText]}>☕ Mola</Text>
-      </Pressable>
+    <View
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+      style={[
+        styles.container,
+        {
+          backgroundColor: c.surface,
+          borderColor: c.border,
+          borderRadius: radius.pill,
+          padding: 4,
+        },
+      ]}
+      accessibilityRole="radiogroup"
+      accessibilityLabel="Odak modu"
+    >
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.indicator,
+          {
+            backgroundColor: alpha(activeColor, 0.14),
+            borderColor: alpha(activeColor, 0.4),
+            borderRadius: radius.pill,
+          },
+          indicatorStyle,
+        ]}
+      />
+      {option('work', 'Çalışma', 'briefcase-outline')}
+      {option('break', 'Mola', 'cafe-outline')}
     </View>
   );
 }
@@ -54,47 +115,23 @@ export function ModeToggle({ mode, onChange, workColor, breakColor }: ModeToggle
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    gap: 6,
-    backgroundColor: '#1E1E24',
-    borderWidth: 1,
-    borderColor: '#2A2A30',
-    borderRadius: 14,
-    padding: 4,
+    alignItems: 'stretch',
+    minHeight: 44,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   indicator: {
     position: 'absolute',
     top: 4,
-    left: 4,
     bottom: 4,
-    width: '50%',
-    borderRadius: 10,
+    left: 4,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  btn: {
+  option: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    backgroundColor: 'transparent',
-  },
-  btnPressed: {
-    opacity: 0.8,
-  },
-  activeWork: {
-    backgroundColor: '#E8A33D',
-  },
-  activeBreak: {
-    backgroundColor: '#FF6B2E',
-  },
-  btnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#9A948C',
-  },
-  activeText: {
-    color: '#0E0E10',
+    gap: 6,
+    paddingVertical: 9,
   },
 });

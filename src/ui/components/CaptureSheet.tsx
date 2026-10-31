@@ -82,11 +82,16 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
   const height = useSharedValue(FALLBACK_HEIGHT);
   /** Seçenek girişleri için 0→1 ilerleme. */
   const enter = useSharedValue(0);
-  const y = useSharedValue(FALLBACK_HEIGHT + 40);
+  // İlk kare ölçümden önce: sheet'in tamamen ekran dışında kalacağı kadar
+  // aşağıda başla. Ölçüm gelince gizli konum kesinleşir.
+  const y = useSharedValue(FALLBACK_HEIGHT + 200);
   const scrim = useSharedValue(0);
 
   useEffect(() => {
     if (open) {
+      // Açılış, ölçülen gizli konumdan başlasın; aksi halde ilk açılış
+      // gereğinden kısa bir mesafe kat eder.
+      y.set(Math.max(height.get(), FALLBACK_HEIGHT) + 40);
       y.set(withSpring(0, spring.gentle));
       scrim.set(withTiming(1, { duration: reduced ? duration.fast : duration.in }));
       enter.set(0);
@@ -135,7 +140,14 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
         pointerEvents={open ? 'box-none' : 'none'}
       >
         <Animated.View
-          onLayout={(event) => height.set(event.nativeEvent.layout.height)}
+          onLayout={(event) => {
+            const measured = event.nativeEvent.layout.height;
+            height.set(measured);
+            // Sheet kapalıyken yükseklik değişirse (font ölçeği, döndürme,
+            // klavye) gizli konumu hemen güncelle. Aksi halde alt kenardan
+            // birkaç piksellik bir dil ekranın altında görünür kalır.
+            if (!open) y.set(Math.max(measured, FALLBACK_HEIGHT) + 40);
+          }}
           pointerEvents={open ? 'auto' : 'none'}
           style={[
             styles.sheet,

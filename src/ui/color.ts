@@ -44,6 +44,25 @@ export function darken(hex: string, amount: number): string {
   return mixWith(hex, { r: 0, g: 0, b: 0 }, amount);
 }
 
+/**
+ * Zemin açık mı? Üzerine yazılacak metnin koyu mu açık mı olacağını seçer.
+ * Kullanıcı seçimli renklerde (odak halkası) kontrastı korur.
+ */
+export function isLightColor(hex: string): boolean {
+  const { r, g, b } = parseHex(hex);
+  // ITU-R BT.601 parlaklık katsayıları: insan gözü yeşile daha duyarlı.
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness > 150;
+}
+
+/**
+ * Verilen zeminin üzerine yazılacak metin/ikon rengi.
+ * Kullanıcı seçimli renklerde (odak halkası) iki temada da okunur kalır.
+ */
+export function inkOn(hex: string): string {
+  return isLightColor(hex) ? '#17140F' : '#FFFFFF';
+}
+
 function mixWith(hex: string, target: { r: number; g: number; b: number }, amount: number): string {
   const { r, g, b, a } = parseHex(hex);
   const t = clamp01(amount);

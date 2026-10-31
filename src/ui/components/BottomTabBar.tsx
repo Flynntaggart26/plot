@@ -32,10 +32,10 @@ const CENTER_GAP = SHORT_SCREEN ? 96 : 120;
  * etiket ve ikonlar kaymaz.
  */
 const TAB_META = {
-  index: { icon: 'calendar-outline', focusedIcon: 'calendar', label: 'Today' },
-  focus: { icon: 'aperture-outline', focusedIcon: 'aperture', label: 'Focus' },
-  notes: { icon: 'document-text-outline', focusedIcon: 'document-text', label: 'Notes' },
-  tangent: { icon: 'bulb-outline', focusedIcon: 'bulb', label: 'Tangent' },
+  index: { icon: 'calendar-outline', focusedIcon: 'calendar', label: 'Bugün' },
+  focus: { icon: 'aperture-outline', focusedIcon: 'aperture', label: 'Odak' },
+  notes: { icon: 'document-text-outline', focusedIcon: 'document-text', label: 'Notlar' },
+  tangent: { icon: 'bulb-outline', focusedIcon: 'bulb', label: 'Fikirler' },
 } as const;
 
 type TabRouteName = keyof typeof TAB_META;

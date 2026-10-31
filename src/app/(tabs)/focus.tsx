@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
-import { View, StyleSheet, Text, SafeAreaView, Switch } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Switch, View, useWindowDimensions } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/ui/theme';
+import { Screen, ScreenIntro, AppText } from '@/ui/components/Screen';
 import { haptic } from '@/lib/haptics';
 import { toast } from '@/lib/toast';
 import { useFocusStore } from '@/features/focus/store';
@@ -12,67 +13,64 @@ import { SettingsGrid } from '@/features/focus/SettingsGrid';
 import { ColorPickers } from '@/features/focus/ColorPickers';
 import { StartButton } from '@/features/focus/StartButton';
 import { formatTime } from '@/features/focus/utils';
-import { FOCUS_RING_CONSTANTS } from '@/features/focus/SegmentPath';
-import { AppText } from '@/ui/components/Screen';
 
+const MAX_RING = 300;
+
+/**
+ * Odak ekranı.
+ *
+ * Sıra tek bir soruya göre kurulur: "Şu an ne yapmalıyım?" Cevap büyük
+ * halka ve hemen altındaki Başlat düğmesidir. Süre, oturum ve renkler
+ * ikinci plandadır; kapalı bir "Ayarlar" bölümünde durur ki ilk bakışta
+ * ekran bir kontrol paneline dönmesin.
+ */
 export default function FocusScreen() {
-  const insets = useSafeAreaInsets();
-  const { c, space } = useTheme();
-  
-  // Store selectors
-  const mode = useFocusStore(s => s.mode);
-  const timeLeft = useFocusStore(s => s.timeLeft);
-  const duration = useFocusStore(s => s.duration);
-  const totalSessions = useFocusStore(s => s.totalSessions);
-  const completedWorkSessions = useFocusStore(s => s.completedWorkSessions);
-  const innerProgress = useFocusStore(s => s.currentSessionProgress);
-  const isRunning = useFocusStore(s => s.isRunning);
-  const isCompleted = useFocusStore(s => s.timeLeft <= 0 && !s.isRunning);
-  const innerColor = useFocusStore(s => s.innerColor);
-  const outerColor = useFocusStore(s => s.outerColor);
-  const breakInnerColor = useFocusStore(s => s.breakInnerColor);
-  const breakOuterColor = useFocusStore(s => s.breakOuterColor);
-  
-  // Break reminder (Feature 9)
-  const breakReminderEnabled = useFocusStore(s => s.breakReminderEnabled);
-  const breakReminderTriggered = useFocusStore(s => s.breakReminderTriggered);
-  const setBreakReminder = useFocusStore(s => s.setBreakReminder);
-  const setBreakReminderTriggered = useFocusStore(s => s.setBreakReminderTriggered);
+  const { c, space, radius } = useTheme();
+  const { width } = useWindowDimensions();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
-  // Actions
-  const startTimer = useFocusStore(s => s.startTimer);
-  const pauseTimer = useFocusStore(s => s.pauseTimer);
-  const resetTimer = useFocusStore(s => s.resetTimer);
-  const setMode = useFocusStore(s => s.setMode);
+  const mode = useFocusStore((state) => state.mode);
+  const timeLeft = useFocusStore((state) => state.timeLeft);
+  const duration = useFocusStore((state) => state.duration);
+  const totalSessions = useFocusStore((state) => state.totalSessions);
+  const completedWorkSessions = useFocusStore((state) => state.completedWorkSessions);
+  const innerProgress = useFocusStore((state) => state.currentSessionProgress);
+  const isRunning = useFocusStore((state) => state.isRunning);
+  const isCompleted = useFocusStore((state) => state.timeLeft <= 0 && !state.isRunning);
+  const innerColor = useFocusStore((state) => state.innerColor);
+  const outerColor = useFocusStore((state) => state.outerColor);
+  const breakInnerColor = useFocusStore((state) => state.breakInnerColor);
+  const breakOuterColor = useFocusStore((state) => state.breakOuterColor);
 
-  // Derived state
+  const breakReminderEnabled = useFocusStore((state) => state.breakReminderEnabled);
+  const breakReminderTriggered = useFocusStore((state) => state.breakReminderTriggered);
+  const setBreakReminder = useFocusStore((state) => state.setBreakReminder);
+  const setBreakReminderTriggered = useFocusStore((state) => state.setBreakReminderTriggered);
+
+  const startTimer = useFocusStore((state) => state.startTimer);
+  const pauseTimer = useFocusStore((state) => state.pauseTimer);
+  const resetTimer = useFocusStore((state) => state.resetTimer);
+  const setMode = useFocusStore((state) => state.setMode);
+
   const isWork = mode === 'work';
+
   const outerSegmentsProgress = useMemo(() => {
     const base = Array(totalSessions).fill(0);
-    if (isWork) {
-      // Çalışma modunda: tamamlanmışlar 1, güncel progress, diğerleri 0
-      for (let i = 0; i < completedWorkSessions; i++) base[i] = 1;
-      if (isRunning && completedWorkSessions < totalSessions) {
-        base[completedWorkSessions] = innerProgress;
-      }
-    } else {
-      // Mola modunda: tamamlanmış çalışmalar 1, mola progress (güncel segment)
-      for (let i = 0; i < completedWorkSessions; i++) base[i] = 1;
-      if (isRunning && completedWorkSessions < totalSessions) {
-        base[completedWorkSessions] = innerProgress;
-      }
+    for (let index = 0; index < completedWorkSessions; index++) base[index] = 1;
+    if (isRunning && completedWorkSessions < totalSessions) {
+      base[completedWorkSessions] = innerProgress;
     }
     return base;
-  }, [isWork, innerProgress, completedWorkSessions, totalSessions, isRunning]);
+  }, [innerProgress, completedWorkSessions, totalSessions, isRunning]);
 
-  // Haptic on completion
+  // Oturum bitince kısa bir dokunsal onay; ekran metni zaten yeni moda döner.
   useEffect(() => {
     if (timeLeft === 0 && !isRunning && duration > 0) {
       haptic('success');
     }
   }, [timeLeft, isRunning, duration]);
 
-  // Break reminder toast (Feature 9)
+  // 2 dakika hareketsizlik: nazik bir mola önerisi (Feature 9).
   useEffect(() => {
     if (breakReminderTriggered) {
       toast('Ara? 2 dakika hareketsiz.');
@@ -80,224 +78,288 @@ export default function FocusScreen() {
     }
   }, [breakReminderTriggered, setBreakReminderTriggered]);
 
-  // Handle timer completion
   const handleTimerPress = useCallback(() => {
     if (isCompleted) {
-      if (mode === 'work') {
-        // Çalışma bitti, mola başlasın (store içinde otomatik)
-        // Sadece UI reset
-        resetTimer();
-      } else {
-        // Mola bitti, çalışmaya devam
-        resetTimer();
-      }
-    } else {
-      haptic(isRunning ? 'light' : 'medium');
-      if (isRunning) {
-        pauseTimer();
-      } else {
-        startTimer();
-      }
+      resetTimer();
+      return;
     }
-  }, [isCompleted, isRunning, mode, startTimer, pauseTimer, resetTimer]);
+    if (isRunning) {
+      pauseTimer();
+    } else {
+      startTimer();
+    }
+  }, [isCompleted, isRunning, startTimer, pauseTimer, resetTimer]);
+
+  const breakLabel = duration >= 15 * 60 ? 'Uzun mola' : 'Kısa mola';
+  const subtitle = isWork
+    ? isRunning
+      ? `${completedWorkSessions + 1}. oturum sürüyor · ${Math.round(duration / 60)} dk`
+      : completedWorkSessions >= totalSessions
+        ? 'Tur tamamlandı. Uzun molayı hak ettin.'
+        : 'Bir blok başlat; gerisini zamanlayıcı tutsun.'
+    : `${breakLabel} · ${Math.round(duration / 60)} dk`;
+
+  const ringSize = Math.max(200, Math.min(MAX_RING, width - space.lg * 4));
+  const timerFont = Math.round(Math.min(64, ringSize * 0.21));
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }}>
-      <View style={[styles.container, { paddingTop: insets.top + space.md }]}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: c.text }]}>
-            {isWork ? 'Odak' : 'Mola'}
-          </Text>
-        </View>
+    <Screen>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: space.xxl }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center' }}>
+          <ScreenIntro
+            eyebrow={isWork ? 'ODAK MODU' : 'MOLA MODU'}
+            title={isWork ? 'Odak' : 'Mola'}
+            subtitle={subtitle}
+          />
 
-        {/* Ring Card */}
-        <View style={styles.ringCard}>
-          <View style={styles.ringWrap}>
-            <RingSVG
-              mode={mode}
-              innerProgress={innerProgress}
-              outerSegmentsProgress={outerSegmentsProgress}
-              totalSessions={totalSessions}
-              completedWorkSessions={completedWorkSessions}
-              isRunning={isRunning}
-              innerColor={innerColor}
-              outerColor={outerColor}
-              breakInnerColor={breakInnerColor}
-              breakOuterColor={breakOuterColor}
-            />
-            <View style={styles.center}>
-              <Text style={[styles.time, { color: isWork ? innerColor : breakInnerColor }]}>
-                {formatTime(timeLeft)}
-              </Text>
-              <View style={styles.modeBadge}>
-                <Text style={[styles.modeIcon, { color: isWork ? innerColor : breakInnerColor }]}>
-                  {isWork ? '🔥' : '☕'}
-                </Text>
-                <Text style={[styles.modeText, { color: isWork ? innerColor : breakInnerColor }]}>
-                  {isWork ? 'Çalışma' : 'Mola'}
-                </Text>
+          <View
+            style={{
+              marginTop: space.md,
+              padding: space.lg,
+              alignItems: 'center',
+              backgroundColor: c.surface,
+              borderRadius: radius.card,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: c.border,
+              overflow: 'hidden',
+            }}
+          >
+            <View pointerEvents="none" style={[styles.edge, { backgroundColor: c.edge }]} />
+
+            <View style={{ width: ringSize, height: ringSize }}>
+              <RingSVG
+                size={ringSize}
+                mode={mode}
+                innerProgress={innerProgress}
+                outerSegmentsProgress={outerSegmentsProgress}
+                totalSessions={totalSessions}
+                completedWorkSessions={completedWorkSessions}
+                isRunning={isRunning}
+                innerColor={innerColor}
+                outerColor={outerColor}
+                breakInnerColor={breakInnerColor}
+                breakOuterColor={breakOuterColor}
+              />
+
+              <View style={styles.center} pointerEvents="none">
+                <AppText
+                  variant="timer"
+                  style={{
+                    color: c.text,
+                    fontSize: timerFont,
+                    lineHeight: timerFont,
+                    letterSpacing: -1,
+                  }}
+                >
+                  {formatTime(timeLeft)}
+                </AppText>
+
+                <View
+                  style={[
+                    styles.modeBadge,
+                    {
+                      backgroundColor: c.surfaceRaised,
+                      borderColor: c.border,
+                      borderRadius: radius.pill,
+                      paddingHorizontal: space.sm,
+                      marginTop: space.xxs,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={isWork ? 'briefcase-outline' : 'cafe-outline'}
+                    size={13}
+                    color={c.textMuted}
+                  />
+                  <AppText variant="meta" style={{ color: c.textMuted, fontWeight: '600' }}>
+                    {isWork ? 'Çalışma' : 'Mola'}
+                  </AppText>
+                </View>
               </View>
+            </View>
+
+            <View style={{ marginTop: space.md, gap: 6, alignItems: 'center' }}>
+              <SessionDots
+                totalSessions={totalSessions}
+                completedWorkSessions={completedWorkSessions}
+                isRunning={isRunning}
+                mode={mode}
+                outerColor={outerColor}
+                breakOuterColor={breakOuterColor}
+              />
+              <AppText variant="meta" faint>
+                {isWork
+                  ? `${Math.min(completedWorkSessions + 1, totalSessions)} / ${totalSessions} oturum`
+                  : `${completedWorkSessions} / ${totalSessions} oturum tamamlandı`}
+              </AppText>
             </View>
           </View>
 
-          {/* Session Dots */}
-          <SessionDots
-            totalSessions={totalSessions}
-            completedWorkSessions={completedWorkSessions}
-            isRunning={isRunning}
-            mode={mode}
-            outerColor={outerColor}
-            breakOuterColor={breakOuterColor}
-          />
-          <Text style={[styles.sessionLabel, { color: c.textMuted }]}>
-            {totalSessions} oturum
-          </Text>
+          <View style={{ flexDirection: 'row', gap: space.xs, marginTop: space.md }}>
+            <View style={{ flex: 1 }}>
+              <StartButton
+                onPress={handleTimerPress}
+                isRunning={isRunning}
+                isCompleted={isCompleted}
+                mode={mode}
+                workColor={innerColor}
+                breakColor={breakInnerColor}
+              />
+            </View>
 
-          {/* Controls */}
-          <View style={styles.controls}>
-            {/* Mode Toggle */}
+            <Pressable
+              onPress={() => {
+                haptic('tick');
+                resetTimer();
+              }}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Oturumu sıfırla"
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: radius.pill,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: c.surface,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: c.border,
+                cursor: 'pointer',
+              }}
+            >
+              <Ionicons name="refresh" size={20} color={c.textMuted} />
+            </Pressable>
+          </View>
+
+          <View style={{ marginTop: space.sm }}>
             <ModeToggle
               mode={mode}
               onChange={setMode}
               workColor={innerColor}
               breakColor={breakInnerColor}
             />
+          </View>
 
-            <View style={styles.divider}>
-              <Text style={styles.dividerText}>Ayarlar</Text>
-            </View>
-
-            <SettingsGrid />
-
-            <View style={styles.divider}>
-              <Text style={styles.dividerText}>Renkler</Text>
-            </View>
-
-            <ColorPickers />
-
-            {/* Mola hatirlaticisi (Feature 9) */}
-            <View
+          <View
+            style={{
+              marginTop: space.md,
+              backgroundColor: c.surface,
+              borderRadius: radius.card,
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: c.border,
+              overflow: 'hidden',
+            }}
+          >
+            <Pressable
+              onPress={() => {
+                haptic('tick');
+                setSettingsOpen((open) => !open);
+              }}
+              accessible
+              accessibilityRole="button"
+              accessibilityState={{ expanded: settingsOpen }}
+              aria-expanded={settingsOpen}
+              accessibilityLabel={settingsOpen ? 'Ayarları kapat' : 'Ayarları aç'}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingVertical: space.xs,
+                gap: space.sm,
+                paddingHorizontal: space.md,
+                paddingVertical: space.sm,
+                minHeight: 56,
+                cursor: 'pointer',
               }}
             >
-              <AppText variant="bodyStrong">Mola hatirlaticisi</AppText>
-              <Switch
-                value={breakReminderEnabled}
-                onValueChange={(next) => {
-                  haptic('tick');
-                  setBreakReminder(next);
-                }}
-                trackColor={{ false: c.border, true: c.focus }}
+              <Ionicons name="options-outline" size={18} color={c.textMuted} />
+              <View style={{ flex: 1, gap: 1 }}>
+                <AppText variant="bodyStrong">Ayarlar</AppText>
+                <AppText variant="meta" faint>
+                  {totalSessions} oturum · süre, renkler, mola hatırlatıcısı
+                </AppText>
+              </View>
+              <Ionicons
+                name={settingsOpen ? 'chevron-up' : 'chevron-down'}
+                size={18}
+                color={c.textMuted}
               />
-            </View>
+            </Pressable>
 
-            {/* Start Button */}
-            <StartButton
-              onPress={handleTimerPress}
-              isRunning={isRunning}
-              isCompleted={isCompleted}
-              mode={mode}
-              workColor={innerColor}
-            />
+            {settingsOpen ? (
+              <View
+                style={{
+                  gap: space.md,
+                  paddingHorizontal: space.md,
+                  paddingBottom: space.md,
+                  paddingTop: space.sm,
+                  borderTopWidth: StyleSheet.hairlineWidth,
+                  borderTopColor: c.border,
+                }}
+              >
+                <SettingsGrid />
+                <ColorPickers />
+
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: space.md,
+                    paddingTop: space.sm,
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: c.border,
+                  }}
+                >
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <AppText variant="bodyStrong">Mola hatırlatıcısı</AppText>
+                    <AppText variant="meta" faint>
+                      2 dakika hareketsiz kalırsan nazikçe hatırlatır.
+                    </AppText>
+                  </View>
+                  <Switch
+                    value={breakReminderEnabled}
+                    onValueChange={(next) => {
+                      haptic('tick');
+                      setBreakReminder(next);
+                    }}
+                    trackColor={{ false: c.border, true: c.focusSoft }}
+                    thumbColor={breakReminderEnabled ? c.focus : c.textFaint}
+                    ios_backgroundColor={c.border}
+                    accessibilityLabel="Mola hatırlatıcısı"
+                  />
+                </View>
+              </View>
+            ) : null}
           </View>
         </View>
-      </View>
-    </SafeAreaView>
+      </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: 20,
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  ringCard: {
-    marginHorizontal: 16,
-    backgroundColor: '#16161A',
-    borderWidth: 1,
-    borderColor: '#2A2A30',
-    borderRadius: 24,
-    padding: 24,
-    paddingBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 24,
-    elevation: 8,
-  },
-  ringWrap: {
-    position: 'relative',
-    width: FOCUS_RING_CONSTANTS.SVG_SIZE,
-    height: FOCUS_RING_CONSTANTS.SVG_SIZE,
-    alignSelf: 'center',
-    marginBottom: 16,
+  edge: {
+    position: 'absolute',
+    top: 0,
+    left: 24,
+    right: 24,
+    height: StyleSheet.hairlineWidth * 2,
   },
   center: {
     position: 'absolute',
-    inset: 0,
-    flexDirection: 'column',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-  },
-  time: {
-    fontSize: 64,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-    fontFamily: 'SF Mono, Monaco, monospace',
-    lineHeight: 64,
   },
   modeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 100,
-  },
-  modeIcon: {
-    fontSize: 14,
-  },
-  modeText: {
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-  sessionLabel: {
-    marginTop: 8,
-    textAlign: 'center',
-    fontSize: 13,
-  },
-  controls: {
-    flexDirection: 'column',
-    gap: 16,
-    marginTop: 8,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginVertical: 4,
-  },
-  dividerText: {
-    flex: 1,
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    color: '#8A847C',
+    gap: 6,
+    paddingVertical: 5,
+    borderWidth: StyleSheet.hairlineWidth,
   },
 });

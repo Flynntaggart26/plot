@@ -1,44 +1,56 @@
 import React from 'react';
-import { View, StyleSheet, Text } from 'react-native';
-import { SelectWrap } from '@/ui/components/SelectWrap';
-import { useFocusStore } from './store';
+import { View } from 'react-native';
 import { useTheme } from '@/ui/theme';
+import { AppText } from '@/ui/components/Screen';
+import { Select } from '@/ui/components/Select';
+import { useFocusStore } from './store';
 
-const DURATION_OPTIONS = Array.from({ length: 120 }, (_, i) => i + 1).map(n => ({ value: n, label: `${n} dk` }));
-const SESSION_OPTIONS = [2, 3, 4, 5, 6, 8].map(n => ({ value: n, label: `${n} oturum` }));
+const DURATION_OPTIONS = Array.from({ length: 120 }, (_, index) => {
+  const minutes = index + 1;
+  return { value: minutes, label: `${minutes} dk` };
+});
 
+const SESSION_OPTIONS = [2, 3, 4, 5, 6, 8].map((count) => ({
+  value: count,
+  label: `${count} oturum`,
+}));
+
+/**
+ * Süre ve oturum sayısı. İkisi de çalışırken kilitlidir: bir bloğun
+ * ortasında süreyi değiştirmek sayacı sıfırlar ve güveni sarsar.
+ */
 export function SettingsGrid() {
-  const { c } = useTheme();
-  const duration = useFocusStore(s => s.duration);
-  const totalSessions = useFocusStore(s => s.totalSessions);
-  const isRunning = useFocusStore(s => s.isRunning);
-  const mode = useFocusStore(s => s.mode);
-  const setDuration = useFocusStore(s => s.setDuration);
-  const setTotalSessions = useFocusStore(s => s.setTotalSessions);
-
-  const durationMinutes = duration / 60;
+  const { space } = useTheme();
+  const duration = useFocusStore((state) => state.duration);
+  const totalSessions = useFocusStore((state) => state.totalSessions);
+  const isRunning = useFocusStore((state) => state.isRunning);
+  const mode = useFocusStore((state) => state.mode);
+  const setDuration = useFocusStore((state) => state.setDuration);
+  const setTotalSessions = useFocusStore((state) => state.setTotalSessions);
 
   return (
-    <View style={styles.grid}>
-      {/* Süre */}
-      <View style={styles.item}>
-        <Text style={[styles.label, { color: c.textFaint }]}>Süre</Text>
-        <SelectWrap
-          value={durationMinutes}
+    <View style={{ flexDirection: 'row', gap: space.sm }}>
+      <View style={{ flex: 1, gap: 6 }}>
+        <AppText variant="meta" muted>
+          Süre
+        </AppText>
+        <Select
+          value={duration / 60}
           options={DURATION_OPTIONS}
-          onChange={val => setDuration(parseInt(val, 10))}
+          onChange={(value) => setDuration(parseInt(value, 10))}
           disabled={isRunning || mode !== 'work'}
-          accessibilityLabel="Çalışma süresi dakika"
+          accessibilityLabel="Çalışma süresi"
         />
       </View>
 
-      {/* Oturum */}
-      <View style={styles.item}>
-        <Text style={[styles.label, { color: c.textFaint }]}>Oturum</Text>
-        <SelectWrap
+      <View style={{ flex: 1, gap: 6 }}>
+        <AppText variant="meta" muted>
+          Oturum
+        </AppText>
+        <Select
           value={totalSessions}
           options={SESSION_OPTIONS}
-          onChange={val => setTotalSessions(parseInt(val, 10))}
+          onChange={(value) => setTotalSessions(parseInt(value, 10))}
           disabled={isRunning}
           accessibilityLabel="Oturum sayısı"
         />
@@ -46,21 +58,3 @@ export function SettingsGrid() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  grid: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  item: {
-    flex: 1,
-    flexDirection: 'column',
-    gap: 6,
-  },
-  label: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-});

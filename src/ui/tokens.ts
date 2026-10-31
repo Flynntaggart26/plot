@@ -27,6 +27,9 @@ export type ColorTokens = {
   /** Odak halkası ve tamamlama */
   focus: string;
   focusSoft: string;
+  /** Mola modu — sıcak turuncu, çalışma vurgusundan ayrı */
+  break: string;
+  breakSoft: string;
   warning: string;
   danger: string;
   /** Overlay / karartma */
@@ -54,6 +57,8 @@ export const color = {
     accentSoft: '#E8A33D22',
     focus: '#7BE0AD',
     focusSoft: '#7BE0AD1F',
+    break: '#FF9F5A',
+    breakSoft: '#FF9F5A1F',
     warning: '#D9A441',
     danger: '#E5675C',
     scrim: '#000000AA',
@@ -76,6 +81,8 @@ export const color = {
     accentSoft: '#94621A1A',
     focus: '#2F9E6A',
     focusSoft: '#2F9E6A14',
+    break: '#B4531B',
+    breakSoft: '#B4531B1A',
     warning: '#94621A',
     danger: '#C24B41',
     scrim: '#1B191766',

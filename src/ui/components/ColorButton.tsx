@@ -1,73 +1,58 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../theme';
+import { inkOn } from '../color';
 
-interface ColorButtonProps {
+/**
+ * Tek renk yuvası. Seçili yuva kalın çerçeve + tik ile anlatılır;
+ * yalnızca renge güvenilmez, renk körlüğünde de ayırt edilir.
+ */
+export function ColorButton({
+  value,
+  selected,
+  onPress,
+  label,
+  disabled = false,
+}: {
   value: string;
-  onChange: (color: string) => void;
+  selected: boolean;
+  onPress: () => void;
   label: string;
   disabled?: boolean;
-  accessibilityLabel?: string;
-}
+}) {
+  const { c } = useTheme();
 
-export function ColorButton({ value, onChange, label, disabled, accessibilityLabel }: ColorButtonProps) {
   return (
-    <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
-      <Pressable
-        style={[
-          styles.btn,
-          disabled && styles.disabled,
-          { backgroundColor: value },
-        ]}
-        onPress={() => !disabled && onChange(value)}
-        disabled={disabled}
-        accessibilityLabel={accessibilityLabel || `${label} rengi, ${value}`}
-        accessibilityRole="button"
-        android_ripple={disabled ? undefined : { color: '#FFFFFF33' }}
-      >
-        <input
-          type="color"
-          value={value}
-          onChange={(e) => !disabled && onChange(e.target.value)}
-          disabled={disabled}
-          style={styles.hiddenInput}
-        />
-      </Pressable>
-    </View>
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessible
+      accessibilityRole="radio"
+      aria-checked={selected}
+      accessibilityLabel={label}
+      style={[
+        styles.swatch,
+        {
+          backgroundColor: value,
+          borderColor: selected ? c.text : c.border,
+          borderWidth: selected ? 2 : StyleSheet.hairlineWidth,
+          opacity: disabled ? 0.5 : 1,
+          cursor: disabled ? 'auto' : 'pointer',
+        },
+      ]}
+    >
+      {selected ? <Ionicons name="checkmark" size={17} color={inkOn(value)} /> : null}
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    flex: 1,
-    flexDirection: 'column',
+  swatch: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
-    gap: 8,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  btn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#2A2A30',
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  disabled: {
-    opacity: 0.5,
-    borderColor: '#3A3A44',
-  },
-  hiddenInput: {
-    position: 'absolute',
-    inset: 0,
-    opacity: 0,
-    width: '100%',
-    height: '100%',
   },
 });

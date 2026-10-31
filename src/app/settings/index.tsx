@@ -2,12 +2,19 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import Constants from 'expo-constants';
 import Animated from 'react-native-reanimated';
 import { SubHeader } from '@/ui/components/SubHeader';
 import { AppText } from '@/ui/components/Screen';
 import { useTheme } from '@/ui/theme';
 import { usePressScale } from '@/ui/motion/hooks';
 import { haptic } from '@/lib/haptics';
+
+/**
+ * Sürüm `app.json`'dan gelir; elle yazılan bir sayı er geç gerçeği
+ * yansıtmaz ve kullanıcı hangi sürümde olduğunu bilemez.
+ */
+const APP_VERSION = Constants.expoConfig?.version ?? '0.0.0';
 
 /**
  * Ayarlar — tercihlerin ve bakım ekranlarının tek giriş noktası.
@@ -56,9 +63,14 @@ export default function SettingsScreen() {
           />
         </View>
 
-        <AppText variant="meta" faint style={{ paddingHorizontal: space.xxs }}>
-          Plot 0.1 · Tüm veriler cihazınızda kalır.
-        </AppText>
+        <View style={{ gap: 2, paddingHorizontal: space.xxs }}>
+          <AppText variant="meta" faint>
+            Plot {APP_VERSION}
+          </AppText>
+          <AppText variant="meta" faint>
+            Tüm veriler cihazında kalır. Hesap yok, bulut yok.
+          </AppText>
+        </View>
       </ScrollView>
     </View>
   );
