@@ -43,7 +43,6 @@ export function SubHeader({
           {...back.handlers}
           onPress={() => {
             haptic('tick');
-            // Derin bağlantıyla gelindiyse geçmiş yoktur: köke düş.
             if (router.canGoBack()) {
               router.back();
             } else {
@@ -64,7 +63,12 @@ export function SubHeader({
             justifyContent: 'center',
           }}
         >
-          <Ionicons name="chevron-back" size={20} color={c.text} />
+          <View style={{ gap: 2, alignItems: 'center' }}>
+            <Ionicons name="chevron-back" size={22} color={c.text} />
+            <AppText variant="meta" muted style={{ fontSize: 10, fontWeight: '600' }}>
+              Geri
+            </AppText>
+          </View>
         </Pressable>
       </Animated.View>
 

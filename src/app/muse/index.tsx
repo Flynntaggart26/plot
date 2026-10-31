@@ -11,6 +11,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useTheme } from '@/ui/theme';
 import { haptic } from '@/lib/haptics';
 import { useThreads, useCreateThread, useSendMessage, useMessages } from '@/features/muse/queries';
@@ -20,6 +21,7 @@ const HAIRLINE = 1;
 
 export default function MuseScreen() {
   const { c, space: sp } = useTheme();
+  const router = useRouter();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const [msgInput, setMsgInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -189,6 +191,28 @@ export default function MuseScreen() {
       enabled
     >
       <View style={headerStyle}>
+        <Pressable
+          onPress={() => {
+            haptic('tick');
+            router.back();
+          }}
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel="Geri"
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: radius.pill,
+            backgroundColor: c.surface,
+            borderWidth: HAIRLINE,
+            borderColor: c.border,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: space.sm,
+          }}
+        >
+          <Ionicons name="chevron-back" size={20} color={c.text} />
+        </Pressable>
         <Ionicons name="chatbubble-ellipses-outline" size={28} color={c.accent} />
         <View style={headerContentStyle}>
           <Text style={headerTitleStyle}>Muse</Text>
