@@ -21,7 +21,7 @@ const APP_VERSION = Constants.expoConfig?.version ?? '0.0.0';
  * Today ekranındaki dişli buradan açılır; her satır kendi alt ekranına gider.
  */
 export default function SettingsScreen() {
-  const { c, space, radius } = useTheme();
+  const { c, space } = useTheme();
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
