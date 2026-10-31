@@ -49,5 +49,14 @@
         "silent": true
       }
     }
+  },
+  "updater": {
+    "active": true,
+    "pubkey": "dW50cnVzdGVkIGNvbW1lbnQOijIWIQYTiqnkVJKWJJ7UwQtMl9R3eS9Z9Q+",
+    "endpoints": [
+      "https://github.com/Flynntaggart26/plot/releases/latest"
+    ],
+    "dialog": false,
+    "verbose": false
   }
 }
