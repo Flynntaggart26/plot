@@ -1,8 +1,8 @@
 // Windows'ta release derlemesinde konsol penceresi açılmasın.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use serde::Serialize;
 use tauri::{Emitter, Manager};
-use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_global_shortcut::ShortcutState;
 use tauri_plugin_updater::UpdaterExt;
 
@@ -21,7 +21,7 @@ fn read_text_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|error| error.to_string())
 }
 
-/// Mevcut sürüm numarasını döndürür (örn. "0.7.3").
+/// Mevcut sürüm numarasını döndürür (örn. "0.7.7").
 #[tauri::command]
 fn current_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
@@ -44,51 +44,78 @@ fn open_external(url: String) -> Result<(), String> {
     Ok(())
 }
 
-/// GitHub releases'dan yeni sürüm denetler. Güncelleme varsa arayüze bildirir.
-#[tauri::command]
-async fn check_for_update(app: tauri::AppHandle) -> Result<bool, String> {
-    let update = app.updater().check().await.map_err(|error| error.to_string())?;
-    if let Some(update) = update {
-        let _ = app.emit(
-            "plot:update-available",
-            serde_json::json!({
-                "version": update.version,
-                "download_url": update.manifest.url,
-                "notes": update.body
-            }),
-        );
-        return Ok(true);
-    }
-    Ok(false)
+/// Arayüze dönen güncelleme bilgisi.
+///
+/// Alan adları `camelCase` olarak serileşir; arayüz `downloadUrl` bekler.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateInfo {
+    pub version: String,
+    pub notes: Option<String>,
+    pub download_url: String,
 }
 
-/// Mevcut güncellemeyi indirir ve kurar. Kurulum sonrası uygulama
-/// yeniden başlatılır; kullanıcının SQLite verileri silinmez.
+/// İndirme ilerlemesi (yüzde hesabı arayüzde yapılır).
+#[derive(Debug, Clone, Serialize)]
+struct UpdateProgress {
+    downloaded: u64,
+    total: Option<u64>,
+}
+
+/// Yayınlanan en son sürümü denetler.
+///
+/// `latest.json` adresinden okunan sürüm, çalışan sürümden yeniyse bilgi döner.
+/// Yeni sürüm yoksa `None` döner (hata değildir).
+#[tauri::command]
+async fn check_for_update(app: tauri::AppHandle) -> Result<Option<UpdateInfo>, String> {
+    let updater = app.updater().map_err(|error| error.to_string())?;
+    let update = updater.check().await.map_err(|error| error.to_string())?;
+
+    Ok(update.map(|update| UpdateInfo {
+        version: update.version,
+        notes: update.body,
+        download_url: update.download_url.to_string(),
+    }))
+}
+
+/// Güncellemeyi indirir, imzasını doğrular ve kurar.
+///
+/// Windows'ta eklenti, kurulumu başlattıktan sonra uygulamayı kendisi kapatır;
+/// NSIS kurulumu tamamlanınca uygulama yeniden açılır. SQLite verileri korunur
+/// çünkü güncelleme yalnızca uygulama dosyalarını değiştirir.
 #[tauri::command]
 async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
-    let update = app.updater().check().await.map_err(|error| error.to_string())?;
+    let updater = app.updater().map_err(|error| error.to_string())?;
+    let update = updater.check().await.map_err(|error| error.to_string())?;
+
     let Some(update) = update else {
         return Err("Güncelleme bulunamadı.".to_string());
     };
 
+    let handle = app.clone();
+    let mut downloaded: u64 = 0;
+
     update
-        .download_and_install(|event| {
-            if let tauri_plugin_updater::UpdateEvent::DownloadedProgress { .. } = event {
-                // İlerleme durumunu arayüze göndermek istenirse buraya eklenebilir.
-            }
-        })
+        .download_and_install(
+            move |chunk_length, total| {
+                downloaded += chunk_length as u64;
+                let _ = handle.emit(
+                    "plot:update-progress",
+                    UpdateProgress { downloaded, total },
+                );
+            },
+            || {},
+        )
         .await
         .map_err(|error| error.to_string())?;
 
-    // Kurulum tamamlandıktan sonra uygulamayı yeniden başlat.
-    let _ = app.restart();
     Ok(())
 }
 
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_updater::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_shortcut("Ctrl+Shift+Space")

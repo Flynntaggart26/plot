@@ -23,67 +23,89 @@ const APP_VERSION = Constants.expoConfig?.version ?? '0.0.0';
 /** Masaüstte (Tauri) otomatik güncelleme denetlemesi; web/mobilde kapalı. */
 const IS_TAURI = Platform.OS !== 'web' && Platform.OS !== 'ios' && Platform.OS !== 'android';
 
+/** Rust tarafındaki `UpdateInfo` ile aynı alanlar (camelCase). */
+type UpdateInfo = {
+  version: string;
+  notes: string | null;
+  downloadUrl: string;
+};
+
+type UpdateProgress = {
+  downloaded: number;
+  total: number | null;
+};
+
 /**
  * Ayarlar — tercihlerin ve bakım ekranlarının tek giriş noktası.
  * Today ekranındaki dişli buradan açılır; her satır kendi alt ekranına gider.
  */
 export default function SettingsScreen() {
   const { c, space } = useTheme();
-  const [updateAvailable, setUpdateAvailable] = useState<{
-    version: string;
-    notes: string;
-    downloadUrl: string;
-  } | null>(null);
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [checking, setChecking] = useState(false);
-  const [downloading, setDownloading] = useState(false);
+  const [installing, setInstalling] = useState(false);
+  const [percent, setPercent] = useState<number | null>(null);
 
-  // Güncelleme mevcut olduğunda Rust'tan gelen olayı dinle.
-  useEffect(() => {
-    if (!IS_TAURI) return undefined;
-    const unlisten = listen<string>('plot:update-available', (event) => {
-      try {
-        const payload = JSON.parse(event.payload);
-        setUpdateAvailable({
-          version: payload.version,
-          notes: payload.notes ?? '',
-          downloadUrl: payload.download_url,
-        });
-        toast(`Yeni sürüm mevcut: ${payload.version}`, 'info');
-      } catch {
-        // Geçersiz yük.
-      }
-    });
-    return () => {
-      void unlisten.then((fn: () => void) => fn());
-    };
-  }, []);
-
-  const checkUpdate = useCallback(async () => {
+  /**
+   * `silent` — uygulama açılışında yapılan denetim. O durumda kullanıcıyı
+   * "güncelleme yok" bildirimiyle rahatsız etmiyoruz; yalnızca yeni sürüm
+   * bulunduğunda haber veriyoruz.
+   */
+  const runCheck = useCallback(async (silent: boolean) => {
     if (!IS_TAURI) return;
     setChecking(true);
     try {
-      const found = await invoke<boolean>('check_for_update');
-      if (!found) {
+      const found = await invoke<UpdateInfo | null>('check_for_update');
+      if (found) {
+        setUpdate(found);
+        toast(`Yeni sürüm hazır: ${found.version}`, 'info');
+      } else if (!silent) {
         toast('Güncelleme yok. En güncel sürümü kullanıyorsunuz.', 'success');
       }
     } catch {
-      toast('Güncelleme denetlenemedi. İnternet bağlantınızı kontrol edin.', 'error');
+      if (!silent) {
+        toast('Güncelleme denetlenemedi. İnternet bağlantınızı kontrol edin.', 'error');
+      }
     } finally {
       setChecking(false);
     }
   }, []);
 
-  const doInstall = useCallback(async () => {
-    if (!IS_TAURI || !updateAvailable) return;
-    setDownloading(true);
+  // Açılışta sessiz denetim: yeni sürüm varsa satır kendiliğinden görünür.
+  // Ekran oturduktan sonra çalışsın diye 400 ms geciktirilir; ağ isteği
+  // ilk kareyle yarışmaz.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void runCheck(true);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [runCheck]);
+
+  // İndirme yüzdesi Rust'tan olay olarak gelir.
+  useEffect(() => {
+    if (!IS_TAURI) return undefined;
+    const unlisten = listen<UpdateProgress>('plot:update-progress', (event) => {
+      const { downloaded, total } = event.payload;
+      setPercent(total ? Math.min(100, Math.round((downloaded / total) * 100)) : null);
+    });
+    return () => {
+      void unlisten.then((off) => off());
+    };
+  }, []);
+
+  const install = useCallback(async () => {
+    if (!IS_TAURI || !update) return;
+    setInstalling(true);
+    setPercent(null);
     try {
       await invoke<void>('install_update');
+      // Başarılıysa Windows kurulumu uygulamayı kapatır; buraya dönülmez.
     } catch {
+      setInstalling(false);
+      setPercent(null);
       toast('Güncelleme kurulamadı. Lütfen tekrar deneyin.', 'error');
-    } finally {
-      setDownloading(false);
     }
-  }, [updateAvailable]);
+  }, [update]);
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -123,8 +145,8 @@ export default function SettingsScreen() {
         {IS_TAURI && (
           <View style={[styles.group]}>
             <Pressable
-              onPress={checkUpdate}
-              disabled={checking}
+              onPress={() => void runCheck(false)}
+              disabled={checking || installing}
               accessible
               accessibilityRole="button"
               accessibilityLabel="Güncellemeleri denetle"
@@ -135,8 +157,6 @@ export default function SettingsScreen() {
                 paddingHorizontal: space.md,
                 paddingVertical: space.md,
                 minHeight: 68,
-                borderTopWidth: StyleSheet.hairlineWidth,
-                borderTopColor: c.border,
                 opacity: checking ? 0.6 : 1,
                 cursor: checking ? 'auto' : 'pointer',
               }}
@@ -151,30 +171,28 @@ export default function SettingsScreen() {
                   backgroundColor: c.surfaceRaised,
                 }}
               >
-                <Ionicons
-                  name={checking ? 'refresh-outline' : 'cloud-download-outline'}
-                  size={18}
-                  color={c.accent}
-                />
+                <Ionicons name="refresh-outline" size={18} color={c.accent} />
               </View>
               <View style={{ flex: 1, gap: 2 }}>
                 <AppText variant="body" style={{ color: c.text }}>
                   Güncellemeleri Denetle
                 </AppText>
                 <AppText variant="meta" muted>
-                  {checking ? 'Denetleniyor…' : 'Otomatik güncelleme denetimi'}
+                  {checking ? 'Denetleniyor…' : `Şu anki sürüm ${APP_VERSION}`}
                 </AppText>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={c.textFaint} />
+              {checking ? (
+                <Ionicons name="hourglass-outline" size={18} color={c.textFaint} />
+              ) : null}
             </Pressable>
 
-            {updateAvailable && (
+            {update && (
               <Pressable
-                onPress={doInstall}
-                disabled={downloading}
+                onPress={install}
+                disabled={installing}
                 accessible
                 accessibilityRole="button"
-                accessibilityLabel={`Sürüm ${updateAvailable.version}'ı güncelle`}
+                accessibilityLabel={`Sürüm ${update.version} güncellemesini kur`}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -184,9 +202,8 @@ export default function SettingsScreen() {
                   borderTopWidth: StyleSheet.hairlineWidth,
                   borderTopColor: c.border,
                   backgroundColor: alpha(c.accent, 0.1),
-                  borderRadius: 0,
-                  cursor: downloading ? 'auto' : 'pointer',
-                  opacity: downloading ? 0.6 : 1,
+                  cursor: installing ? 'auto' : 'pointer',
+                  opacity: installing ? 0.7 : 1,
                 }}
               >
                 <View
@@ -196,21 +213,27 @@ export default function SettingsScreen() {
                     borderRadius: 18,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: downloading ? c.textMuted : c.accent,
+                    backgroundColor: c.accent,
                   }}
                 >
-                  {downloading ? (
-                    <Ionicons name="refresh-outline" size={18} color="#FFFFFF" />
-                  ) : (
-                    <Ionicons name="arrow-down-circle" size={18} color="#FFFFFF" />
-                  )}
+                  <Ionicons
+                    name={installing ? 'cloud-download-outline' : 'arrow-down-circle'}
+                    size={18}
+                    color="#FFFFFF"
+                  />
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
                   <AppText variant="bodyStrong" style={{ color: c.accent }}>
-                    {downloading ? 'Güncelleniyor…' : `Sürüm ${updateAvailable.version} Güncelle`}
+                    {installing
+                      ? percent === null
+                        ? 'İndiriliyor…'
+                        : `İndiriliyor… %${percent}`
+                      : `Sürüm ${update.version} Güncelle`}
                   </AppText>
-                  <AppText variant="meta" muted>
-                    Uygulama kapatılarak güncellenecek; verileriniz silinmez.
+                  <AppText variant="meta" muted numberOfLines={2}>
+                    {installing
+                      ? 'İndirme bitince kurulum açılır; verileriniz silinmez.'
+                      : (update.notes?.trim() || 'Uygulama yeniden başlayacak; verileriniz silinmez.')}
                   </AppText>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={c.accent} />

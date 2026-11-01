@@ -56,10 +56,14 @@ jobs:
 
             **Kurulumsuz:** `Plot_..._x64_portable.zip` dosyasını indirip açın ve `Plot.exe` dosyasını çalıştırın.
 
+            **Otomatik güncelleme:** `Plot_..._x64-setup.exe` ile kurulan sürümler, uygulama içindeki **Ayarlar → Güncellemeleri Denetle** akışından kendini güncelleyebilir. Güncelleme paketleri imzalıdır (`latest.json` + `.sig`).
+
             Veriler cihazda kalır (SQLite); hesap veya bulut gerekmez.
           releaseDraft: false
           prerelease: false
           args: '--bundles nsis'
+          uploadUpdaterJson: true
+          uploadUpdaterSignatures: true
 
       - name: Package portable exe
         shell: pwsh
@@ -69,7 +73,7 @@ jobs:
             "src-tauri/target/release/Plot.exe"
           )
           $exe = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $exe) { throw "Portable exe bulunamadı: $($candidates -join ', ')" }
+          if (-not $exe) { throw "Portable exe bulunamadi: $($candidates -join ', ')" }
           New-Item -ItemType Directory -Force -Path portable | Out-Null
           Copy-Item $exe portable/Plot.exe
           Compress-Archive -Path portable/Plot.exe -DestinationPath "Plot_${{ steps.tauri.outputs.appVersion }}_x64_portable.zip" -Force
