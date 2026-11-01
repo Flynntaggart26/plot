@@ -51,5 +51,14 @@
         "silent": true
       }
     }
+  },
+  "updater": {
+    "active": true,
+    "pubkey": "GENERATE_WITH_cargo_tauri_signer_generate_AND_PASTE_HERE",
+    "endpoints": [
+      "https://github.com/Flynntaggart26/plot/releases/latest"
+    ],
+    "dialog": false,
+    "verbose": false
   }
 }
