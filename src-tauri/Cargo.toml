@@ -1,6 +1,6 @@
 [package]
 name = "plot"
-version = "0.7.3"
+version = "0.7.4"
 description = "ADHD dostu günlük planlama"
 authors = ["Egehan"]
 edition = "2021"
