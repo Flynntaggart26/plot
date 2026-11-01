@@ -54,7 +54,7 @@
   },
   "updater": {
     "active": true,
-    "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgxNDY0OUZDRjk4Qjg2NUMKUldSY2hvdjUvRWxHZ1FYRk4xV0pOQVJlb1hlS0pIZ3h3dXVzbzhCazVvbDl6TFBMM2JwMFJ1YUkK",
+    "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZDNUE0NUYwQzU0MTRGNkUKUldSdVQwSEY4RVZhYklSMHVSaFJFc0JJYXR5Y012aXV1NEluNGRDZjZIcU92OGUyRlNpUFpqaFQK",
     "endpoints": [
       "https://github.com/Flynntaggart26/plot/releases/latest"
     ],
