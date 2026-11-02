@@ -1,11 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 import Animated from 'react-native-reanimated';
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
+import { isTauriRuntime } from '@/lib/file-transfer';
 import { alpha } from '@/ui/color';
 import { SubHeader } from '@/ui/components/SubHeader';
 import { AppText } from '@/ui/components/Screen';
@@ -20,8 +19,13 @@ import { toast } from '@/lib/toast';
  */
 const APP_VERSION = Constants.expoConfig?.version ?? '0.0.0';
 
-/** Masaüstte (Tauri) otomatik güncelleme denetlemesi; web/mobilde kapalı. */
-const IS_TAURI = Platform.OS !== 'web' && Platform.OS !== 'ios' && Platform.OS !== 'android';
+/**
+ * Masaüstü (Tauri) tespiti `isTauriRuntime()` ile yapılır.
+ *
+ * `Platform.OS` bu uygulamada masaüstünde de 'web' döner: Tauri, Expo'nun
+ * web çıktısını (react-native-web) yükler. Bu yüzden `Platform.OS !== 'web'`
+ * kontrolü masaüstünde daima false olur ve güncelleme arayüzü hiç görünmez.
+ */
 
 /** Rust tarafındaki `UpdateInfo` ile aynı alanlar (camelCase). */
 type UpdateInfo = {
@@ -41,6 +45,7 @@ type UpdateProgress = {
  */
 export default function SettingsScreen() {
   const { c, space } = useTheme();
+  const isDesktop = isTauriRuntime();
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [checking, setChecking] = useState(false);
   const [installing, setInstalling] = useState(false);
@@ -52,9 +57,10 @@ export default function SettingsScreen() {
    * bulunduğunda haber veriyoruz.
    */
   const runCheck = useCallback(async (silent: boolean) => {
-    if (!IS_TAURI) return;
+    if (!isTauriRuntime()) return;
     setChecking(true);
     try {
+      const { invoke } = await import('@tauri-apps/api/core');
       const found = await invoke<UpdateInfo | null>('check_for_update');
       if (found) {
         setUpdate(found);
@@ -83,21 +89,33 @@ export default function SettingsScreen() {
 
   // İndirme yüzdesi Rust'tan olay olarak gelir.
   useEffect(() => {
-    if (!IS_TAURI) return undefined;
-    const unlisten = listen<UpdateProgress>('plot:update-progress', (event) => {
-      const { downloaded, total } = event.payload;
-      setPercent(total ? Math.min(100, Math.round((downloaded / total) * 100)) : null);
-    });
+    if (!isTauriRuntime()) return undefined;
+
+    let dispose: (() => void) | undefined;
+    let cancelled = false;
+
+    void (async () => {
+      const { listen } = await import('@tauri-apps/api/event');
+      const unlisten = await listen<UpdateProgress>('plot:update-progress', (event) => {
+        const { downloaded, total } = event.payload;
+        setPercent(total ? Math.min(100, Math.round((downloaded / total) * 100)) : null);
+      });
+      if (cancelled) unlisten();
+      else dispose = unlisten;
+    })();
+
     return () => {
-      void unlisten.then((off) => off());
+      cancelled = true;
+      dispose?.();
     };
   }, []);
 
   const install = useCallback(async () => {
-    if (!IS_TAURI || !update) return;
+    if (!isTauriRuntime() || !update) return;
     setInstalling(true);
     setPercent(null);
     try {
+      const { invoke } = await import('@tauri-apps/api/core');
       await invoke<void>('install_update');
       // Başarılıysa Windows kurulumu uygulamayı kapatır; buraya dönülmez.
     } catch {
@@ -142,7 +160,7 @@ export default function SettingsScreen() {
           />
         </View>
 
-        {IS_TAURI && (
+        {isDesktop && (
           <View style={[styles.group]}>
             <Pressable
               onPress={() => void runCheck(false)}
