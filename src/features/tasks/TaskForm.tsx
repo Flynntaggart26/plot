@@ -11,6 +11,12 @@ import { usePressScale } from '@/ui/motion/hooks';
 import { haptic } from '@/lib/haptics';
 import type { Task } from '@/db/schema';
 import { MUST_DO_LIMIT, type TaskEnergy } from './service';
+import {
+  buildRecurrence,
+  recurrenceKind,
+  recurrenceLabel,
+  type RecurrenceKind,
+} from './recurrence';
 
 export type TaskFormValues = {
   title: string;
@@ -19,6 +25,7 @@ export type TaskFormValues = {
   energy: TaskEnergy | null;
   mustDo: boolean;
   audioPath: string | null;
+  recurringRule: string | null;
 };
 
 const ESTIMATES: { value: number | null; label: string }[] = [
@@ -34,6 +41,13 @@ const ENERGY_OPTIONS: { value: TaskEnergy; label: string }[] = [
   { value: 'low', label: 'Düşük' },
   { value: 'mid', label: 'Orta' },
   { value: 'high', label: 'Yüksek' },
+];
+
+const REPEAT_OPTIONS: { value: RecurrenceKind | null; label: string }[] = [
+  { value: null, label: 'Yok' },
+  { value: 'daily', label: 'Her gün' },
+  { value: 'weekly', label: 'Her hafta' },
+  { value: 'monthly', label: 'Her ay' },
 ];
 
 /** Aynı form hem yeni görev hem düzenleme için kullanılır. */
@@ -65,7 +79,18 @@ export function TaskForm({
     initial ? initial.priority === 1 : defaultMustDo && openMustDoCount < MUST_DO_LIMIT,
   );
   const [audioPath, setAudioPath] = useState<string | null>(initial?.audioPath ?? null);
+  const [recurringRule, setRecurringRule] = useState<string | null>(
+    initial?.recurringRule ?? null,
+  );
   const [localError, setLocalError] = useState<string | null>(null);
+
+  /**
+   * Tekrarın çapası görevin günüdür; yeni görevde seçim anı. Kural metni
+   * yalnızca kullanıcı bir tür seçtiğinde yeniden üretilir; böylece
+   * başlığı düzenlemek mevcut "her pazartesi" kuralını bozmaz.
+   */
+  const repeatKind = recurrenceKind(recurringRule);
+  const repeatHint = recurrenceLabel(recurringRule);
 
   const startingMustDo = initial ? initial.priority === 1 : false;
   const mustDoFull = openMustDoCount >= MUST_DO_LIMIT && !startingMustDo;
@@ -83,7 +108,15 @@ export function TaskForm({
       return;
     }
     setLocalError(null);
-    onSubmit({ title, notes, estimateMin, energy, mustDo: shownMustDo, audioPath });
+    onSubmit({
+      title,
+      notes,
+      estimateMin,
+      energy,
+      mustDo: shownMustDo,
+      audioPath,
+      recurringRule,
+    });
   };
 
   return (
@@ -157,6 +190,39 @@ export function TaskForm({
               />
             ))}
           </View>
+        </View>
+
+        <View style={{ gap: space.xs }}>
+          <AppText variant="meta" muted style={{ letterSpacing: 0.6 }}>
+            TEKRAR
+          </AppText>
+          <View
+            style={styles.wrap}
+            accessibilityRole="radiogroup"
+            accessibilityLabel="Tekrar sıklığı"
+          >
+            {REPEAT_OPTIONS.map((option) => (
+              <Chip
+                key={option.label}
+                label={option.label}
+                selected={repeatKind === option.value}
+                role="radio"
+                onPress={() =>
+                  setRecurringRule(
+                    buildRecurrence(
+                      option.value,
+                      new Date(initial?.scheduledAt ?? new Date().toISOString()),
+                    ),
+                  )
+                }
+              />
+            ))}
+          </View>
+          <AppText variant="meta" faint>
+            {repeatHint
+              ? `${repeatHint} · Tamamlandığında sonraki otomatik oluşur.`
+              : 'Tek seferlik görev.'}
+          </AppText>
         </View>
 
         <MustDoToggle

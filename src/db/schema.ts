@@ -210,6 +210,10 @@ export const dailyPlans = sqliteTable(
     intention: text('intention'),
     capacityMin: integer('capacity_min'),
     aiSummary: text('ai_summary'),
+    /** Günü kapatırken yazılan tek cümlelik değerlendirme. */
+    reflection: text('reflection'),
+    /** Günü kapatma zamanı; null ise gün hâlâ açık. */
+    closedAt: text('closed_at'),
   },
   (table) => [check('daily_plans_energy_check', sql`${table.energy} between 1 and 5`)],
 );

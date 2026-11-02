@@ -15,7 +15,7 @@ import { MUST_DO_LIMIT, type DayTasks } from '@/features/tasks/service';
 import { TaskRow } from '@/features/tasks/TaskRow';
 import { EnergyRow } from '@/features/today/EnergyRow';
 import { Timeline } from '@/features/today/Timeline';
-import { useDayEnergy, useSetDayEnergy } from '@/features/today/queries';
+import { useDayEnergy, useDayPlan, useSetDayEnergy } from '@/features/today/queries';
 
 /**
  * Today — günün tek bakışta görünen hâli.
@@ -33,6 +33,7 @@ export default function TodayScreen() {
 
   const tasksQuery = useDayTasks(dayKey);
   const energyQuery = useDayEnergy(dayKey);
+  const planQuery = useDayPlan(dayKey);
   const setEnergy = useSetDayEnergy(dayKey);
   const toggle = useToggleTask();
 
@@ -143,7 +144,21 @@ export default function TodayScreen() {
 
         <SectionCard
           label="BUGÜNÜN GÖREVLERİ"
-          count={data ? String(data.open.length) : '—'}
+          count={data ? String(data.open.length) : '-'}
+          action={
+            <Pressable
+              onPress={() => {
+                haptic('tick');
+                router.push('/library');
+              }}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Tüm görevleri aç"
+              style={styles.cardAction}
+            >
+              <Ionicons name="library-outline" size={19} color={c.textMuted} />
+            </Pressable>
+          }
         >
           {tasksQuery.isPending ? (
             <LoadingSkeleton />
@@ -162,6 +177,15 @@ export default function TodayScreen() {
             <TaskList data={data} list="done" onToggle={onToggle} isPending={isPending} />
           </SectionCard>
         ) : null}
+
+        <CloseDayCard
+          closed={Boolean(planQuery.data?.closedAt)}
+          reflection={planQuery.data?.reflection ?? null}
+          onPress={() => {
+            haptic('tick');
+            router.push('/close-day');
+          }}
+        />
 
         <Timeline />
       </ScrollView>
@@ -272,6 +296,67 @@ function SectionCard({
 
       {children}
     </View>
+  );
+}
+
+function CloseDayCard({
+  closed,
+  reflection,
+  onPress,
+}: {
+  closed: boolean;
+  reflection: string | null;
+  onPress: () => void;
+}) {
+  const { c, space, radius } = useTheme();
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={closed ? 'Günü güncelle' : 'Günü kapat'}
+      style={{
+        marginTop: space.md,
+        padding: space.md,
+        backgroundColor: c.surface,
+        borderRadius: radius.card,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: closed ? c.focusSoft : c.border,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.sm,
+        cursor: 'pointer',
+      }}
+    >
+      <View
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: radius.pill,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: closed ? c.focusSoft : c.surfaceRaised,
+        }}
+      >
+        <Ionicons
+          name={closed ? 'checkmark' : 'moon-outline'}
+          size={19}
+          color={closed ? c.focus : c.accent}
+        />
+      </View>
+
+      <View style={{ flex: 1, gap: 2 }}>
+        <AppText variant="bodyStrong">{closed ? 'Gün kapandı' : 'Günü kapat'}</AppText>
+        <AppText variant="meta" muted numberOfLines={2}>
+          {closed
+            ? reflection || 'Yarın için hazır.'
+            : 'Yarım kalanları yarına taşı, yarının üçünü seç.'}
+        </AppText>
+      </View>
+
+      <Ionicons name="chevron-forward" size={16} color={c.textFaint} />
+    </Pressable>
   );
 }
 

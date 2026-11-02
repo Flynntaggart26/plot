@@ -77,8 +77,20 @@ export function useUpdateTask(id: string) {
   });
 }
 
-export function useDeleteTask() {
+/** Kütüphaneden "bugüne al": yalnızca plan tarihini değiştirir. */
+export function useRescheduleTask() {
   const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, scheduledAt }: { id: string; scheduledAt: string | null }) =>
+      Promise.resolve(updateTask(id, { scheduledAt })),
+    onSuccess: (task) => {
+      queryClient.setQueryData(taskKeys.detail(task.id), task);
+      void queryClient.invalidateQueries({ queryKey: taskKeys.all });
+    },
+  });
+}
+
+export function useDeleteTask() {  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
       await deleteTask(id);

@@ -17,6 +17,7 @@ export function Chip({
   role = 'button',
   disabled = false,
   style,
+  accessibilityLabel,
 }: {
   label: string;
   selected: boolean;
@@ -24,6 +25,11 @@ export function Chip({
   role?: 'button' | 'radio' | 'checkbox';
   disabled?: boolean;
   style?: ViewStyle;
+  /**
+   * Ekranda kısa görünen ama tek başına anlaşılmayan etiketler için
+   * (ör. bir satırdaki "Yarına") ekran okuyucuya tam bağlam verir.
+   */
+  accessibilityLabel?: string;
 }) {
   const { c, radius, space } = useTheme();
   const { style: pressStyle, handlers } = usePressScale(disabled);
@@ -40,7 +46,7 @@ export function Chip({
         disabled={disabled}
         accessible
         accessibilityRole={role}
-        accessibilityLabel={label}
+        accessibilityLabel={accessibilityLabel ?? label}
         aria-selected={role === 'button' ? selected : undefined}
         aria-checked={role === 'button' ? undefined : selected}
         style={[

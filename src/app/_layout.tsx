@@ -154,6 +154,8 @@ function MigratingStack({ database }: { database: AppDatabase }) {
           }}
         >
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="library" />
+          <Stack.Screen name="close-day" />
           <Stack.Screen name="plan/index" />
           <Stack.Screen name="stats" />
           <Stack.Screen name="muse/index" />

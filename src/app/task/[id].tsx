@@ -48,6 +48,7 @@ export default function TaskDetailScreen() {
         energy: values.energy,
         mustDo: values.mustDo,
         audioPath: values.audioPath,
+        recurringRule: values.recurringRule,
       },
       {
         onSuccess: () => {

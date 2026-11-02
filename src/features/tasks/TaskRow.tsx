@@ -17,6 +17,7 @@ import { timeLabel } from '@/lib/date';
 import { alpha } from '@/ui/color';
 import { spring } from '@/ui/tokens';
 import type { Task } from '@/db/schema';
+import { recurrenceLabel } from './recurrence';
 
 const ENERGY_LABEL: Record<string, string> = {
   low: 'düşük enerji',
@@ -36,10 +37,16 @@ export function TaskRow({
   task,
   onToggle,
   pending = false,
+  metaOverride,
+  trailing,
 }: {
   task: Task;
   onToggle: (done: boolean) => void;
   pending?: boolean;
+  /** Saat yerine gösterilecek metin (ör. kütüphanede tarih). */
+  metaOverride?: string;
+  /** Sağdaki chevron'un önüne eklenecek eylem. */
+  trailing?: React.ReactNode;
 }) {
   const { c, space, radius } = useTheme();
   const router = useRouter();
@@ -49,9 +56,10 @@ export function TaskRow({
 
   const done = task.status === 'done' || task.status === 'dropped';
   const meta = [
-    task.scheduledAt ? timeLabel(task.scheduledAt) : null,
+    metaOverride ?? (task.scheduledAt ? timeLabel(task.scheduledAt) : null),
     task.estimateMin ? `${task.estimateMin} dk` : null,
     task.energy ? ENERGY_LABEL[task.energy] : null,
+    recurrenceLabel(task.recurringRule),
   ]
     .filter(Boolean)
     .join(' · ');
@@ -150,6 +158,7 @@ export function TaskRow({
         ) : null}
       </Pressable>
 
+      {trailing}
       <Ionicons name="chevron-forward" size={16} color={hovered ? c.textMuted : c.textFaint} />
     </View>
   );

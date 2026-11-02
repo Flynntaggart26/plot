@@ -1,9 +1,10 @@
-import { and, asc, desc, eq, gte, lt, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNull, lt, or, sql } from 'drizzle-orm';
 import { getDb } from '@/db/client';
 import { INBOX_AREA_ID, INBOX_PROJECT_ID } from '@/db/seed';
 import { areas, projects, taskEvents, tasks, type Task } from '@/db/schema';
 import { dayBounds, dateFromDayKey, localDayKey } from '@/lib/date';
 import { newId } from '@/lib/id';
+import { nextFutureOccurrence, parseRecurrence } from './recurrence';
 
 /**
  * Görev servisi — UI'ın SQL gördüğü tek yer.
@@ -35,6 +36,8 @@ export type CreateTaskInput = {
   scheduledAt?: string | null;
   /** Ses kaydı dosya yolu (Feature 6 – Voice-to-Task). */
   audioPath?: string | null;
+  /** `daily`, `weekly:1` veya `monthly:15`; null ise tek seferlik. */
+  recurringRule?: string | null;
 };
 
 export type UpdateTaskInput = {
@@ -46,6 +49,7 @@ export type UpdateTaskInput = {
   scheduledAt?: string | null;
   /** Ses kaydı dosya yolu (Feature 6 – Voice-to-Task). */
   audioPath?: string | null;
+  recurringRule?: string | null;
 };
 
 /** Kullanıcıya gösterilebilir, beklenen hata. */
@@ -80,6 +84,11 @@ export function createTask(input: CreateTaskInput): Task {
   const db = getDb();
   const title = normalizeTitle(input.title);
   const mustDo = Boolean(input.mustDo);
+  const recurringRule = input.recurringRule?.trim() || null;
+
+  if (recurringRule && !parseRecurrence(recurringRule)) {
+    throw new TaskError('Tekrar kuralı geçersiz.');
+  }
 
   if (mustDo && countOpenMustDos() >= MUST_DO_LIMIT) {
     throw new TaskError(`Aynı anda en fazla ${MUST_DO_LIMIT} must-do açık olabilir.`);
@@ -117,6 +126,7 @@ export function createTask(input: CreateTaskInput): Task {
         scheduledAt: input.scheduledAt === undefined ? now : input.scheduledAt,
         duration: null,
         audioPath: input.audioPath ?? null,
+        recurringRule,
         status: 'open',
         createdAt: now,
       })
@@ -182,6 +192,17 @@ export function updateTask(id: string, patch: UpdateTaskInput): Task {
     changed.push('audioPath');
   }
 
+  if (patch.recurringRule !== undefined) {
+    const next = patch.recurringRule?.trim() || null;
+    if (next && !parseRecurrence(next)) {
+      throw new TaskError('Tekrar kuralı geçersiz.');
+    }
+    if (next !== current.recurringRule) {
+      changes.recurringRule = next;
+      changed.push('recurringRule');
+    }
+  }
+
   if (patch.mustDo !== undefined) {
     const nextPriority = patch.mustDo ? 1 : 0;
     if (nextPriority !== current.priority) {
@@ -224,6 +245,11 @@ export function completeTask(id: string): Task {
   if (current.status === 'done') return current;
 
   const now = new Date().toISOString();
+  const rule = current.recurringRule;
+  const nextISO = rule
+    ? nextFutureOccurrence(rule, current.scheduledAt ?? current.createdAt ?? now, new Date(now))
+    : null;
+
   db.transaction((tx) => {
     tx.update(tasks)
       .set({ status: 'done', completedAt: now })
@@ -235,6 +261,54 @@ export function completeTask(id: string): Task {
         taskId: id,
         type: 'completed',
         payloadJson: null,
+        createdAt: now,
+      })
+      .run();
+
+    if (!rule || !nextISO) return;
+
+    // Aynı tekrar zaten açıksa ikinci kopya üretme (çift tamamlama,
+    // iki cihazda aynı anda dokunma gibi durumlar).
+    const existing = tx
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.status, 'open'),
+          eq(tasks.title, current.title),
+          eq(tasks.recurringRule, rule),
+          eq(tasks.scheduledAt, nextISO),
+        ),
+      )
+      .get();
+    if (existing) return;
+
+    const nextId = newId();
+    tx.insert(tasks)
+      .values({
+        id: nextId,
+        projectId: current.projectId,
+        title: current.title,
+        notes: current.notes,
+        // Tekrar eden görev must-do'yu devralmaz: yarının üçü her gün
+        // kendiliğinden dolmasın, kullanıcı seçsin.
+        priority: 0,
+        estimateMin: current.estimateMin,
+        energy: current.energy,
+        scheduledAt: nextISO,
+        duration: current.duration,
+        recurringRule: rule,
+        status: 'open',
+        createdAt: now,
+      })
+      .run();
+
+    tx.insert(taskEvents)
+      .values({
+        id: newId(),
+        taskId: nextId,
+        type: 'created',
+        payloadJson: JSON.stringify({ recurring: true, from: id }),
         createdAt: now,
       })
       .run();
@@ -303,7 +377,14 @@ export async function deleteTask(id: string): Promise<void> {
   db.delete(tasks).where(eq(tasks.id, id)).run();
 }
 
-/** Bugünün görevleri: bugüne planlananlar + açık must-do'lar + bugün tamamlananlar. */
+/**
+ * Bugünün görevleri: bugüne planlananlar + bugüne kadar biriken açık
+ * must-do'lar + bugün tamamlananlar.
+ *
+ * Must-do'lar tarihsiz kalsa bile görünür; ancak yarına planlanan bir
+ * must-do bugünün ekranına sızmaz. Günü kapatırken seçilen "yarının üçü"
+ * ancak yarın ortaya çıkar.
+ */
 export function listDayTasks(dayKey: string = localDayKey()): DayTasks {
   const db = getDb();
   const bounds = dayBounds(dateFromDayKey(dayKey));
@@ -314,7 +395,11 @@ export function listDayTasks(dayKey: string = localDayKey()): DayTasks {
     .where(
       or(
         and(gte(tasks.scheduledAt, bounds.start), lt(tasks.scheduledAt, bounds.end)),
-        and(eq(tasks.priority, 1), eq(tasks.status, 'open')),
+        and(
+          eq(tasks.priority, 1),
+          eq(tasks.status, 'open'),
+          or(isNull(tasks.scheduledAt), lt(tasks.scheduledAt, bounds.end)),
+        ),
         and(gte(tasks.completedAt, bounds.start), lt(tasks.completedAt, bounds.end)),
       ),
     )

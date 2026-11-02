@@ -2,7 +2,7 @@
   "expo": {
     "name": "Plot",
     "slug": "plot",
-    "version": "0.7.8",
+    "version": "0.8.0",
     "scheme": "plot",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
