@@ -27,6 +27,53 @@ fn current_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+/// Arayüze dönen ham HTTP yanıtı.
+#[derive(Debug, Clone, Serialize)]
+struct HttpJsonResponse {
+    status: u16,
+    body: String,
+}
+
+/// AI isteğini Rust tarafından yapar.
+///
+/// WebView'in CORS kuralları yerel Ollama gibi sunuculara doğrudan erişimi
+/// engeller; Rust istemcisinde böyle bir kısıt yoktur. Gövde ve başlıklar
+/// arayüzde hazırlanır, burada yalnızca taşınır.
+#[tauri::command]
+async fn ai_http_post(
+    url: String,
+    headers: std::collections::HashMap<String, String>,
+    body: String,
+    timeout_ms: Option<u64>,
+) -> Result<HttpJsonResponse, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_millis(
+            timeout_ms.unwrap_or(120_000),
+        ))
+        .build()
+        .map_err(|error| error.to_string())?;
+
+    let mut request = client.post(&url).body(body);
+    for (key, value) in headers {
+        request = request.header(key, value);
+    }
+
+    let response = request.send().await.map_err(|error| {
+        if error.is_timeout() {
+            format!("TIMEOUT: {error}")
+        } else if error.is_connect() {
+            format!("CONNECT: {error}")
+        } else {
+            format!("HTTP: {error}")
+        }
+    })?;
+
+    let status = response.status().as_u16();
+    let body = response.text().await.map_err(|error| error.to_string())?;
+
+    Ok(HttpJsonResponse { status, body })
+}
+
 /// Verilen URL'yi varsayılan tarayıcıda açar.
 #[tauri::command]
 fn open_external(url: String) -> Result<(), String> {
@@ -141,6 +188,7 @@ fn main() {
             read_text_file,
             current_version,
             open_external,
+            ai_http_post,
             check_for_update,
             install_update
         ])

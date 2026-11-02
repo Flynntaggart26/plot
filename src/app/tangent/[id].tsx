@@ -110,6 +110,7 @@ export default function IdeaDetail() {
         body: values.body,
         firstStep: values.firstStep,
         status: values.status,
+        audioPath: values.audioPath,
       },
       {
         onSuccess: () => {

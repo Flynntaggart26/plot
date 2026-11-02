@@ -2,6 +2,7 @@ import { desc, eq } from 'drizzle-orm';
 import { getDb } from '@/db/client';
 import { ideas, type Idea } from '@/db/schema';
 import { newId } from '@/lib/id';
+import { removeRecordingFile } from '@/features/audio/recording';
 
 /**
  * Fikir (Tangent) servisi.
@@ -27,6 +28,8 @@ export type CreateIdeaInput = {
   firstStep?: string | null;
   status?: IdeaStatus;
   source?: string | null;
+  /** Sesli fikir kaydı; dosya yolu ya da web'de data URI. */
+  audioPath?: string | null;
 };
 
 export type UpdateIdeaInput = {
@@ -34,6 +37,7 @@ export type UpdateIdeaInput = {
   body?: string | null;
   firstStep?: string | null;
   status?: IdeaStatus;
+  audioPath?: string | null;
 };
 
 export class IdeaError extends Error {
@@ -66,6 +70,7 @@ export function createIdea(input: CreateIdeaInput): Idea {
       firstStep: optionalText(input.firstStep),
       status: input.status ?? 'spark',
       source: input.source ?? 'quick-capture',
+      audioPath: input.audioPath ?? null,
       createdAt: now,
     })
     .run();
@@ -95,6 +100,9 @@ export function updateIdea(id: string, patch: UpdateIdeaInput): Idea {
   if (patch.body !== undefined) changes.body = optionalText(patch.body);
   if (patch.firstStep !== undefined) changes.firstStep = optionalText(patch.firstStep);
   if (patch.status !== undefined) changes.status = patch.status;
+  if (patch.audioPath !== undefined && patch.audioPath !== current.audioPath) {
+    changes.audioPath = patch.audioPath;
+  }
 
   if (Object.keys(changes).length === 0) return current;
 
@@ -105,6 +113,12 @@ export function updateIdea(id: string, patch: UpdateIdeaInput): Idea {
   return updated;
 }
 
-export function deleteIdea(id: string): void {
+export async function deleteIdea(id: string): Promise<void> {
+  const current = getIdea(id);
+  if (!current) return;
+
+  // Sesli fikir kaydı veritabanından önce silinir; dosya ortada kalmaz.
+  if (current.audioPath) await removeRecordingFile(current.audioPath);
+
   getDb().delete(ideas).where(eq(ideas.id, id)).run();
 }

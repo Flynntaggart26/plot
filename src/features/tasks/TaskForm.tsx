@@ -9,6 +9,7 @@ import { TextField } from '@/ui/components/TextField';
 import { Button } from '@/ui/components/Button';
 import { usePressScale } from '@/ui/motion/hooks';
 import { haptic } from '@/lib/haptics';
+import { VoiceNote } from '@/features/audio/VoiceNote';
 import type { Task } from '@/db/schema';
 import { MUST_DO_LIMIT, type TaskEnergy } from './service';
 import {
@@ -252,45 +253,7 @@ export function TaskForm({
           </View>
         ) : null}
 
-        {audioPath ? (
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: space.xs,
-              paddingHorizontal: space.md,
-              marginTop: space.xs,
-              backgroundColor: c.surfaceRaised,
-              borderWidth: StyleSheet.hairlineWidth,
-              borderColor: c.border,
-              borderRadius: radius.pill,
-            }}
-          >
-            <Ionicons name="musical-notes" size={16} color={c.accent} />
-            <AppText variant="meta" muted>
-              Ses kaydı eklendi
-            </AppText>
-            <Pressable
-              onPress={() => {
-                haptic('light');
-              }}
-              accessibilityLabel="Ses kaydını dinle"
-              style={{ padding: 4 }}
-            >
-              <Ionicons name="play-outline" size={16} color={c.accent} />
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                setAudioPath(null);
-                haptic('light');
-              }}
-              accessibilityLabel="Kaydı kaldır"
-              style={{ padding: 4 }}
-            >
-              <Ionicons name="trash-outline" size={16} color={c.danger} />
-            </Pressable>
-          </View>
-        ) : null}
+        <VoiceNote value={audioPath} onChange={setAudioPath} />
 
         <Button label={submitLabel} onPress={submit} loading={busy} disabled={!title.trim()} />
 

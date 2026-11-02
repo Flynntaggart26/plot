@@ -13,8 +13,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/ui/theme';
+import { Button } from '@/ui/components/Button';
 import { haptic } from '@/lib/haptics';
-import { useThreads, useCreateThread, useSendMessage, useMessages } from '@/features/muse/queries';
+import { useThreads, useCreateThread, useSendMessage, useMessages, useAiConfig } from '@/features/muse/queries';
+import { AiError } from '@/features/muse/ai';
 import { space, radius } from '@/ui/tokens';
 
 const HAIRLINE = 1;
@@ -25,6 +27,7 @@ export default function MuseScreen() {
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const [msgInput, setMsgInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<{ message: string; needsSettings: boolean } | null>(null);
 
 
   const { data: threads, isLoading: threadsLoading } = useThreads();
@@ -32,44 +35,41 @@ export default function MuseScreen() {
   const activeThreadId = threadId ?? threads?.[0]?.id;
   const { data: messages, isLoading: messagesLoading } = useMessages(activeThreadId);
   const sendMessage = useSendMessage();
+  const aiConfig = useAiConfig();
   const busy = sending || sendMessage.isPending;
+  const aiReady = Boolean(aiConfig.data?.enabled);
 
   const currentThread = threads?.find((t) => t.id === activeThreadId) ?? threads?.[0];
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     const text = msgInput.trim();
-    if (!text || sending) return;
+    if (!text || busy) return;
+    setError(null);
     setSending(true);
 
-    const deliver = (tid: string) => {
-      sendMessage.mutate(
-        { threadId: tid, role: 'user', content: text },
-        {
-          onSuccess: () => {
-            setMsgInput('');
-            setSending(false);
-          },
-          onError: () => setSending(false),
-        },
-      );
-    };
+    try {
+      let targetId = activeThreadId;
+      if (!targetId) {
+        const thread = await createThread.mutateAsync({ title: text.slice(0, 40) });
+        targetId = thread.id;
+        setThreadId(thread.id);
+      }
 
-    if (!activeThreadId) {
-      createThread.mutate(
-        { title: text.slice(0, 40) },
-        {
-          onSuccess: (thread: { id: string }) => {
-            setThreadId(thread.id);
-            deliver(thread.id);
-          },
-          onError: () => setSending(false),
-        },
-      );
-      return;
+      await sendMessage.mutateAsync({ threadId: targetId, role: 'user', content: text });
+      setMsgInput('');
+    } catch (cause) {
+      // Mesaj kaybolmaz: gönderilemeyen metin giriş alanına geri döner.
+      setMsgInput((current) => current || text);
+      setError({
+        message: cause instanceof Error ? cause.message : 'Mesaj gönderilemedi.',
+        needsSettings:
+          cause instanceof AiError &&
+          (cause.kind === 'config' || cause.kind === 'auth' || cause.kind === 'connection'),
+      });
+    } finally {
+      setSending(false);
     }
-
-    deliver(activeThreadId);
-  }, [msgInput, activeThreadId, sending, createThread, sendMessage]);
+  }, [msgInput, activeThreadId, busy, createThread, sendMessage]);
 
   if (threadsLoading) {
     return (
@@ -216,13 +216,16 @@ export default function MuseScreen() {
         <Ionicons name="chatbubble-ellipses-outline" size={28} color={c.accent} />
         <View style={headerContentStyle}>
           <Text style={headerTitleStyle}>Muse</Text>
-          <Text style={headerSubtitleStyle}>
-            {currentThread?.title || 'Yeni sohbet ba\u015flat\u0131n'}
+          <Text style={headerSubtitleStyle} numberOfLines={1}>
+            {aiReady
+              ? `${aiConfig.data?.model ?? 'model'} · ${currentThread?.title ?? 'Yeni sohbet'}`
+              : 'Henüz bir modele bağlı değil'}
           </Text>
         </View>
         <Pressable
           onPress={createNewThread}
           accessible
+          accessibilityRole="button"
           accessibilityLabel="Yeni sohbet"
         >
           <Ionicons name="create-outline" size={20} color={c.textMuted} />
@@ -242,6 +245,45 @@ export default function MuseScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {!aiReady ? (
+          <View
+            style={{
+              alignItems: 'center',
+              gap: sp.xs,
+              padding: sp.md,
+              borderRadius: radius.card,
+              backgroundColor: c.surface,
+              borderWidth: HAIRLINE,
+              borderColor: c.border,
+            }}
+          >
+            <Ionicons name="cloud-offline-outline" size={22} color={c.textMuted} />
+            <Text style={{ color: c.text, fontSize: 15, fontWeight: '600' }}>
+              Muse henüz bağlı değil
+            </Text>
+            <Text
+              style={{
+                color: c.textMuted,
+                fontSize: 13,
+                textAlign: 'center',
+                lineHeight: 19,
+              }}
+            >
+              Yerel Ollama ya da OpenAI uyumlu bir model bağla. Sohbet geçmişi cihazda kalır.
+            </Text>
+            <View style={{ marginTop: sp.xs }}>
+              <Button
+                label="AI ayarları"
+                icon="settings-outline"
+                onPress={() => {
+                  haptic('tick');
+                  router.push('/settings/ai');
+                }}
+              />
+            </View>
+          </View>
+        ) : null}
+
         {(messages ?? []).map((msg) => {
           const isUser = msg.role === 'user';
           return (
@@ -278,7 +320,7 @@ export default function MuseScreen() {
           </View>
         )}
 
-        {!messagesLoading && (messages ?? []).length === 0 ? (
+        {aiReady && !messagesLoading && (messages ?? []).length === 0 ? (
           <View
             style={{
               alignItems: 'center',
@@ -319,41 +361,115 @@ export default function MuseScreen() {
         ) : null}
       </ScrollView>
 
-      <View style={inputContainerStyle}>
-        <TextInput
-          value={msgInput}
-          onChangeText={setMsgInput}
-          placeholder={activeThreadId ? 'Mesaj yaz\u0131n...' : '\u0130lk mesaj\u0131n\u0131z\u0131 yaz\u0131n ve sohbeti ba\u015flat\u0131n...'}
-          multiline
-          style={[
-            textInputStyle,
-            {
-              backgroundColor: c.surface,
-              borderColor: c.border,
-              borderRadius: radius.pill,
-              paddingHorizontal: space.md,
-              paddingVertical: sp.sm,
-            },
-          ]}
-          onSubmitEditing={handleSend}
-        />
-        <Pressable
-          onPress={handleSend}
-          disabled={busy || !msgInput.trim()}
-          accessible
-          accessibilityLabel="Gönder"
-          style={[
-            sendButtonStyle,
-            { backgroundColor: (busy || !msgInput.trim()) ? c.border : c.accent },
-          ]}
+      {error ? (
+        <View
+          style={{
+            paddingHorizontal: space.lg,
+            paddingTop: sp.sm,
+            backgroundColor: c.bg,
+          }}
         >
-          <Ionicons
-            name={busy ? 'reload-circle' : 'send-outline'}
-            size={20}
-            color={c.bg}
+          <View
+            accessibilityRole="alert"
+            style={{
+              borderWidth: HAIRLINE,
+              borderColor: c.danger,
+              backgroundColor: c.surface,
+              borderRadius: radius.md,
+              padding: sp.sm,
+              gap: sp.xs,
+            }}
+          >
+            <Text style={{ color: c.danger, fontSize: 13, lineHeight: 18 }}>
+              {error.message}
+            </Text>
+            {error.needsSettings ? (
+              <Pressable
+                onPress={() => {
+                  haptic('tick');
+                  router.push('/settings/ai');
+                }}
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel="AI ayarlarını aç"
+              >
+                <Text style={{ color: c.accent, fontSize: 13, fontWeight: '600' }}>
+                  AI ayarlarını aç
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
+
+      {!aiReady ? (
+        <View style={[inputContainerStyle, { justifyContent: 'center' }]}>
+          <Pressable
+            onPress={() => {
+              haptic('tick');
+              router.push('/settings/ai');
+            }}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="Muse'yi bir modele bağla"
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: sp.xs,
+              width: '100%',
+              minHeight: 48,
+              paddingHorizontal: space.md,
+              borderRadius: radius.pill,
+              backgroundColor: c.surface,
+              borderWidth: HAIRLINE,
+              borderColor: c.border,
+            }}
+          >
+            <Ionicons name="settings-outline" size={17} color={c.accent} />
+            <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>
+              Muse&apos;yi bir modele bağla
+            </Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={inputContainerStyle}>
+          <TextInput
+            value={msgInput}
+            onChangeText={setMsgInput}
+            placeholder="Mesaj yazın..."
+            multiline
+            style={[
+              textInputStyle,
+              {
+                backgroundColor: c.surface,
+                borderColor: c.border,
+                borderRadius: radius.pill,
+                paddingHorizontal: space.md,
+                paddingVertical: sp.sm,
+              },
+            ]}
+            onSubmitEditing={handleSend}
           />
-        </Pressable>
-      </View>
+          <Pressable
+            onPress={handleSend}
+            disabled={busy || !msgInput.trim()}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="Gönder"
+            style={[
+              sendButtonStyle,
+              { backgroundColor: busy || !msgInput.trim() ? c.border : c.accent },
+            ]}
+          >
+            <Ionicons
+              name={busy ? 'reload-circle' : 'send-outline'}
+              size={20}
+              color={c.bg}
+            />
+          </Pressable>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }

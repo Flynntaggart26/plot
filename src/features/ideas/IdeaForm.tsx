@@ -5,6 +5,7 @@ import { AppText } from '@/ui/components/Screen';
 import { Chip } from '@/ui/components/Chip';
 import { TextField } from '@/ui/components/TextField';
 import { Button } from '@/ui/components/Button';
+import { VoiceNote } from '@/features/audio/VoiceNote';
 import type { Idea } from '@/db/schema';
 import { IDEA_STATUS_LABELS, type IdeaStatus } from './service';
 
@@ -13,6 +14,7 @@ export type IdeaFormValues = {
   body: string;
   firstStep: string;
   status: IdeaStatus;
+  audioPath: string | null;
 };
 
 const STATUS_OPTIONS: { value: IdeaStatus; label: string }[] = (
@@ -45,6 +47,7 @@ export function IdeaForm({
   const [body, setBody] = useState(initial?.body ?? '');
   const [firstStep, setFirstStep] = useState(initial?.firstStep ?? '');
   const [status, setStatus] = useState<IdeaStatus>((initial?.status as IdeaStatus) ?? 'spark');
+  const [audioPath, setAudioPath] = useState<string | null>(initial?.audioPath ?? null);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const shownError = localError ?? error ?? null;
@@ -60,6 +63,7 @@ export function IdeaForm({
       body: body.trim(),
       firstStep: firstStep.trim(),
       status,
+      audioPath,
     });
   };
 
@@ -130,6 +134,8 @@ export function IdeaForm({
             </View>
           </View>
         ) : null}
+
+        <VoiceNote value={audioPath} onChange={setAudioPath} />
 
         {shownError ? (
           <View

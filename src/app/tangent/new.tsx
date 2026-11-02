@@ -24,6 +24,7 @@ export default function NewIdeaScreen() {
         body: values.body,
         firstStep: values.firstStep,
         status: 'spark',
+        audioPath: values.audioPath,
       },
       {
         onSuccess: () => {

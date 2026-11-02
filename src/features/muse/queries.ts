@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createMessage,
   createThread,
+  deleteMessage,
   deleteThread,
-  generateMockResponse,
   getThread,
   listMessages,
   listThreads,
@@ -11,6 +11,7 @@ import {
   type CreateMessageInput,
   type CreateThreadInput,
 } from './service';
+import { chatWithMuse, getAiConfig } from './ai';
 import type { ChatMessage, ChatThread } from '@/db/schema';
 
 export const museKeys = {
@@ -18,7 +19,16 @@ export const museKeys = {
   threads: ['muse', 'threads'] as const,
   thread: (id: string) => ['muse', 'thread', id] as const,
   messages: (threadId: string) => ['muse', 'messages', threadId] as const,
+  aiConfig: ['muse', 'ai-config'] as const,
 };
+
+/** Model bağlantısı ayarı; kaydedince bu sorgu geçersiz kılınır. */
+export function useAiConfig() {
+  return useQuery({
+    queryKey: museKeys.aiConfig,
+    queryFn: () => getAiConfig(),
+  });
+}
 
 export function useThreads() {
   return useQuery({
@@ -86,18 +96,34 @@ export function useSendMessage() {
 
   return useMutation({
     mutationFn: async (input: CreateMessageInput) => {
-      // Kullanıcı mesajını kaydet
+      // Kullanıcı mesajı önce kaydedilir: model yanıtı beklerken de görünür.
       const userMsg = createMessage(input);
 
-      // Mock AI yanıtı üret
-      const aiContent = generateMockResponse(input.content);
-      const aiMsg = createMessage({
-        threadId: input.threadId,
-        role: 'assistant',
-        content: aiContent,
-      });
+      try {
+        // Geçmiş veritabanından okunur; ekran kapansa bile bağlam aynı kalır.
+        const history = listMessages(input.threadId)
+          .filter((message) => message.role === 'user' || message.role === 'assistant')
+          .map((message) => ({
+            role: message.role as 'user' | 'assistant',
+            content: message.content,
+          }));
 
-      return { userMsg, aiMsg };
+        const reply = await chatWithMuse(history);
+        const aiMsg = createMessage({
+          threadId: input.threadId,
+          role: 'assistant',
+          content: reply.content,
+          model: reply.model,
+          tokensIn: reply.tokensIn,
+          tokensOut: reply.tokensOut,
+        });
+
+        return { userMsg, aiMsg };
+      } catch (error) {
+        // Başarısız istek geçmişte yarım kalmaz; metin giriş alanına döner.
+        deleteMessage(userMsg.id);
+        throw error;
+      }
     },
     onSuccess: (data, vars) => {
       queryClient.setQueryData<ChatMessage[]>(

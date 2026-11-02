@@ -129,27 +129,11 @@ export function listMessages(threadId: string): ChatMessage[] {
 }
 
 /**
- * Mock AI yanıtı — gerçek LLM entegrasyonu eklenmeden önce geliştiriciye
- * kullanıcı mesajına dayalı basit bir yanıt döner.
+ * Gönderilemeyen mesajı geri alır.
+ *
+ * Model yanıt vermezse kullanıcı mesajı geçmişte "cevapsız" olarak kalmaz;
+ * metin giriş alanına geri döner ve tekrar denenebilir.
  */
-export function generateMockResponse(userContent: string): string {
-  const lower = userContent.toLowerCase();
-
-  if (lower.includes('merhaba') || lower.includes('selam')) {
-    return 'Merhaba! Ben Muse, Plot\'un AI asistanınızıyım. Size nasıl yardımcı olabilirim?';
-  }
-  if (lower.includes('görev') || lower.includes('task')) {
-    return 'Görevlerinizi organize etmenize yardımcı olabilirim. Önceki olarak 3 must-do kısıtlamasıyla en önemli işlerinize odaklanmanızı öneririm.';
-  }
-  if (lower.includes('plan') || lower.includes('planla')) {
-    return 'Günlük planınızı ayarlamak için Enerji seçiciyi ve haftalık görünümü kullanabilirsiniz. Hangi gün için planlamak istiyorsunuz?';
-  }
-  if (lower.includes('not') || lower.includes('note')) {
-    return 'Bağlantılı not ağınızı kurabilirsiniz. [[Başlık]] şeklinde notlar arasında link kurabilirsiniz.';
-  }
-  if (lower.includes('yardım') || lower.includes('help')) {
-    return 'Şunlarla yardımcı olabilirim:\n• Görev oluşturma ve düzenleme\n• Günlük planlama ve enerji ayarı\n• Not bağlantıları\n• Odak oturumu takibi\n\nNe yapmak istiyorsun?';
-  }
-
-  return 'Mesajınızı aldım. Şu an için mock modundayım; gerçek AI yanıtları için LLM entegrasyonu eklenmesi gerekiyor.';
+export function deleteMessage(id: string): void {
+  getDb().delete(chatMessages).where(eq(chatMessages.id, id)).run();
 }

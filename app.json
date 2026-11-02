@@ -2,7 +2,7 @@
   "expo": {
     "name": "Plot",
     "slug": "plot",
-    "version": "0.8.0",
+    "version": "0.9.0",
     "scheme": "plot",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -32,7 +32,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Plot, sesli fikir kaydı için mikrofonunu kullanır."
+          "microphonePermission": "Plot, sesli fikir ve görev kaydı için mikrofonunu kullanır."
         }
       ],
       [

@@ -56,9 +56,9 @@ export function useUpdateIdea(id: string) {
 export function useDeleteIdea() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => {
-      deleteIdea(id);
-      return Promise.resolve(id);
+    mutationFn: async (id: string) => {
+      await deleteIdea(id);
+      return id;
     },
     onSuccess: (id) => {
       queryClient.removeQueries({ queryKey: ideaKeys.detail(id) });
